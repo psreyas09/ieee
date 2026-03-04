@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getOpportunity } from '../services/api';
-import { ArrowLeft, Calendar, Building, Globe, ExtLink, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Building, Globe, CheckCircle } from 'lucide-react';
 
 export default function OpportunityDetail() {
     const { id } = useParams();

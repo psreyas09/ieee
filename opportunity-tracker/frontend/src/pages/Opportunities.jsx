@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Filter } from 'lucide-react';
 import { getOpportunities, getOrganizations } from '../services/api';
 import OpportunityCard from '../components/OpportunityCard';
