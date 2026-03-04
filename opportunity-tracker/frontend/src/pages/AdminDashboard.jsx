@@ -1,0 +1,192 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity } from '../services/api';
+import { Activity, Trash2, ExternalLink, RefreshCw, LogOut } from 'lucide-react';
+
+export default function AdminDashboard() {
+    const navigate = useNavigate();
+    const [orgs, setOrgs] = useState([]);
+    const [opps, setOpps] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [scrapingId, setScrapingId] = useState(null);
+    const [toast, setToast] = useState('');
+
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            navigate('/admin/login');
+            return;
+        }
+        fetchData();
+    }, [navigate]);
+
+    const fetchData = async () => {
+        try {
+            const [orgsData, oppsData] = await Promise.all([
+                getOrganizations(),
+                getOpportunities({ limit: 100 })
+            ]);
+            setOrgs(orgsData);
+            setOpps(oppsData.data);
+        } catch (err) {
+            if (err.response?.status === 401) {
+                localStorage.removeItem('token');
+                navigate('/admin/login');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const showToast = (msg) => {
+        setToast(msg);
+        setTimeout(() => setToast(''), 5000);
+    };
+
+    const handleScrape = async (orgId, orgName) => {
+        setScrapingId(orgId);
+        showToast(`Started scraping ${orgName}...`);
+        try {
+            const result = await triggerScrape(orgId);
+            showToast(`Success! Found ${result.opportunitiesFound} items, added ${result.newAdded} new.`);
+            fetchData(); // refresh data
+        } catch (error) {
+            const msg = error.response?.data?.error || error.message;
+            showToast(`Failed: ${msg}`);
+            // Log raw output if failed to parse
+            if (error.response?.data?.raw) {
+                console.error("Raw Gemini Output:", error.response.data.raw);
+            }
+        } finally {
+            setScrapingId(null);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (!confirm('Are you sure you want to delete this opportunity?')) return;
+        try {
+            await deleteOpportunity(id);
+            showToast('Opportunity deleted successfully.');
+            fetchData();
+        } catch (error) {
+            showToast('Failed to delete opportunity.');
+        }
+    };
+
+    const logout = () => {
+        localStorage.removeItem('token');
+        navigate('/admin/login');
+    };
+
+    if (loading) return <div className="py-20 text-center text-slate-500">Loading admin panel...</div>;
+
+    return (
+        <div className="space-y-8 animate-in fade-in">
+            {/* Toast Notification */}
+            {toast && (
+                <div className="fixed bottom-4 right-4 bg-slate-900 text-white px-6 py-3 rounded-lg shadow-2xl z-50 flex items-center gap-2 animate-in slide-in-from-bottom-5">
+                    <Activity size={18} className="text-ieee-blue" /> {toast}
+                </div>
+            )}
+
+            <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
+                    <p className="text-slate-500">Manage data and trigger synchronization.</p>
+                </div>
+                <button onClick={logout} className="flex items-center gap-2 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg font-medium transition-colors">
+                    <LogOut size={18} /> Logout
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+                {/* Left Col - Organizations Scraper */}
+                <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px]">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                        <h2 className="font-bold text-slate-800">Trigger Scraping</h2>
+                        <p className="text-xs text-slate-500 mt-1">Free-tier safe calls to Gemini API.</p>
+                    </div>
+                    <div className="overflow-y-auto flex-grow p-4 space-y-3">
+                        {orgs.map(org => (
+                            <div key={org.id} className="border border-slate-200 rounded-lg p-3 hover:border-ieee-blue/30 transition-colors">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-semibold text-sm text-slate-800">{org.name}</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Last: {org.lastScrapedAt ? new Date(org.lastScrapedAt).toLocaleString() : 'Never'}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleScrape(org.id, org.name)}
+                                        disabled={scrapingId === org.id}
+                                        className={`p-2 rounded-md ${scrapingId === org.id ? 'bg-slate-100 text-slate-400' : 'bg-ieee-blue/10 text-ieee-blue hover:bg-ieee-blue hover:text-white'} transition-colors`}
+                                        title="Fetch & Analyze"
+                                    >
+                                        <RefreshCw size={16} className={scrapingId === org.id ? 'animate-spin' : ''} />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Right Col - Recent / Manage Opportunities */}
+                <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px]">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <div>
+                            <h2 className="font-bold text-slate-800">Recent Opportunities</h2>
+                            <p className="text-xs text-slate-500 mt-1">Showing last 100 entries.</p>
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto overflow-y-auto flex-grow">
+                        <table className="w-full text-left border-collapse text-sm">
+                            <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th className="py-3 px-4 font-semibold text-slate-700">Title</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700">Type</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700">Status</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {opps.map(opp => (
+                                    <tr key={opp.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                        <td className="py-3 px-4 max-w-xs block truncate" title={opp.title}>
+                                            <span className="font-medium text-slate-800">{opp.title}</span>
+                                        </td>
+                                        <td className="py-3 px-4 text-slate-600">{opp.type}</td>
+                                        <td className="py-3 px-4">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${opp.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                {opp.status}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4">
+                                            <div className="flex gap-2">
+                                                {opp.url && (
+                                                    <a href={opp.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-ieee-blue bg-white rounded shadow-sm border border-slate-200">
+                                                        <ExternalLink size={14} />
+                                                    </a>
+                                                )}
+                                                <button onClick={() => handleDelete(opp.id)} className="p-1.5 text-slate-400 hover:text-red-600 bg-white rounded shadow-sm border border-slate-200">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {opps.length === 0 && (
+                                    <tr>
+                                        <td colSpan="4" className="text-center py-8 text-slate-500">No opportunities found.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+}
