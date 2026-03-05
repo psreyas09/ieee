@@ -2,6 +2,7 @@ require('dotenv').config();
 const axios = require('axios');
 const cheerio = require('cheerio');
 const { GoogleGenAI } = require('@google/genai');
+const https = require('https');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -22,6 +23,7 @@ async function fetchAndExtractText(url) {
                 'Sec-Fetch-Site': 'none',
                 'Sec-Fetch-User': '?1'
             },
+            httpsAgent: new https.Agent({ rejectUnauthorized: false }),
             timeout: 10000 // 10 second timeout
         });
 
