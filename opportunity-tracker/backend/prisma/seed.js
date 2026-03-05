@@ -12,7 +12,7 @@ const societies = [
     { name: 'Communications', web: 'https://comsoc.org' },
     { name: 'Computational Intelligence', web: 'https://ieee-cis.org' },
     { name: 'Computer', web: 'https://computer.org' },
-    { name: 'Consumer Technology', web: 'https://ieee-ctssociety.org' },
+    { name: 'Consumer Technology', web: 'https://ctsoc.ieee.org/' },
     { name: 'Control Systems', web: 'https://ieeecss.org' },
     { name: 'Dielectrics and Electrical Insulation', web: 'https://deis.ieee.org' },
     { name: 'Education', web: 'https://ieee-edusociety.org' },
