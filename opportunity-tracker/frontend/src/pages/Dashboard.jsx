@@ -48,7 +48,7 @@ export default function Dashboard() {
                 <div className="relative z-10 max-w-2xl">
                     <h2 className="text-3xl md:text-4xl font-extrabold mb-4 tracking-tight">Discover Your Next Big Opportunity</h2>
                     <p className="text-lg md:text-xl text-slate-300 mb-8 leading-relaxed">
-                        Welcome to the centralized hub for IEEE student members in the Kerala Section. Find hackathons, paper contests, and grants curated specifically for you.
+                        Welcome to the global centralized hub for IEEE student members. Find hackathons, paper contests, and grants curated specifically for you.
                     </p>
                     <Link to="/opportunities" className="inline-flex items-center gap-2 bg-ieee-blue hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-md">
                         Browse All Opportunities <ArrowRight size={20} />

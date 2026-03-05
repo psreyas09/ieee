@@ -12,7 +12,7 @@ export default function Layout({ children }) {
                             IEEE
                         </div>
                         <div>
-                            <h1 className="text-xl md:text-2xl font-bold leading-tight">Kerala Section</h1>
+                            <h1 className="text-xl md:text-2xl font-bold leading-tight">Global</h1>
                             <p className="text-sm md:text-base text-ieee-gold font-medium">Opportunity Tracker</p>
                         </div>
                     </Link>
@@ -33,7 +33,7 @@ export default function Layout({ children }) {
 
             <footer className="bg-ieee-navy text-slate-400 py-6 mt-12">
                 <div className="max-w-7xl mx-auto px-4 text-center text-sm flex flex-col items-center gap-2">
-                    <p>© {new Date().getFullYear()} IEEE Kerala Section. All rights reserved.</p>
+                    <p>© {new Date().getFullYear()} IEEE. All rights reserved.</p>
                     <p>This platform automatically aggregates public opportunities for students.</p>
                 </div>
             </footer>
