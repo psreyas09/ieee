@@ -63,7 +63,7 @@ app.get('/api/stats', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching stats:', error);
-        res.status(500).json({ error: 'Internal server error', details: error.message, envDB: !!process.env.NEON_DATABASE_URL });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -80,7 +80,7 @@ app.get('/api/organizations', async (req, res) => {
         res.json(organizations);
     } catch (error) {
         console.error('Error fetching organizations:', error);
-        res.status(500).json({ error: 'Internal server error', details: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -124,7 +124,7 @@ app.get('/api/opportunities', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching opportunities:', error);
-        res.status(500).json({ error: 'Internal server error', details: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
