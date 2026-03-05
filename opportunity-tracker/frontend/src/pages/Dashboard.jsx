@@ -5,7 +5,7 @@ import { getStats, getOpportunities } from '../services/api';
 import OpportunityCard from '../components/OpportunityCard';
 
 export default function Dashboard() {
-    const [stats, setStats] = parseInt(useState(null));
+    const [stats, setStats] = useState(null);
     const [urgent, setUrgent] = useState([]);
     const [loading, setLoading] = useState(true);
 
