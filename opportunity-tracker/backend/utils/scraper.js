@@ -57,34 +57,36 @@ async function fetchAndExtractText(url) {
 async function analyzeWithGemini(text) {
     const prompt = `From the following webpage text, extract all student competitions, paper contests, grants, hackathons, fellowships, workshops or any opportunities relevant to IEEE student members. Return ONLY a valid JSON array with no extra text, no preamble, no markdown. Each object must have: title (string), description (string 2-3 sentences), deadline (ISO 8601 date string or null), eligibility (string), url (string or null), type (one of: Competition, Paper Contest, Grant, Hackathon, Fellowship, Workshop, Webinar, Other), status (one of: Live, Upcoming, Closed). Webpage text: ${text}`;
 
-    try {
+    // Helper to call a specific model and parse
+    const tryModel = async (modelName) => {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: modelName,
             contents: prompt
         });
 
         const output = response.text;
+        const cleanJsonStr = output.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const opportunities = JSON.parse(cleanJsonStr);
 
-        // Attempt to parse JSON safely
-        try {
-            // Sometimes models might wrap in markdown even when instructed not to. Clean it if so:
-            const cleanJsonStr = output.replace(/```json/gi, '').replace(/```/g, '').trim();
-            const opportunities = JSON.parse(cleanJsonStr);
-
-            // Ensure it's an array
-            if (!Array.isArray(opportunities)) {
-                throw new Error("Output is not a JSON array.");
-            }
-
-            return { success: true, data: opportunities, raw: null };
-        } catch (parseError) {
-            console.error("Failed to parse Gemini JSON output:", parseError.message);
-            return { success: false, data: null, raw: output, error: "Failed to parse JSON" };
+        if (!Array.isArray(opportunities)) {
+            throw new Error("Output is not a JSON array.");
         }
+        return opportunities;
+    };
 
-    } catch (apiError) {
-        console.error("Gemini API Error:", apiError);
-        throw new Error(`Gemini API Error: ${apiError.message}`);
+    try {
+        console.log("Attempting extraction with gemini-2.5-flash-lite...");
+        const opportunities = await tryModel('gemini-2.5-flash-lite');
+        return { success: true, data: opportunities, raw: null };
+    } catch (liteError) {
+        console.warn(`flash-lite failed: ${liteError.message}. Falling back to gemini-2.5-flash...`);
+        try {
+            const opportunities = await tryModel('gemini-2.5-flash');
+            return { success: true, data: opportunities, raw: null };
+        } catch (flashError) {
+            console.error("Both models failed to parse JSON output.", flashError.message);
+            return { success: false, data: null, raw: null, error: `JSON Parse Fallback Failed: ${flashError.message}` };
+        }
     }
 }
 
