@@ -271,7 +271,7 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
 
     } catch (error) {
         console.error('Scraping error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: error.message, stack: error.stack, geminiKeyOk: !!process.env.GEMINI_API_KEY });
     }
 });
 
