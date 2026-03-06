@@ -85,7 +85,7 @@ async function analyzeWithGemini(text) {
             return { success: true, data: opportunities, raw: null };
         } catch (flashError) {
             console.error("Both models failed to parse JSON output.", flashError.message);
-            return { success: false, data: null, raw: null, error: `JSON Parse Fallback Failed: ${flashError.message}` };
+            return { success: false, data: null, raw: flashError.message, error: `JSON Parse Fallback Failed: ${flashError.message}` };
         }
     }
 }
