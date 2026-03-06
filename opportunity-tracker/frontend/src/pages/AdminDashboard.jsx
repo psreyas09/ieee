@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity } from '../services/api';
-import { Activity, Trash2, ExternalLink, RefreshCw, LogOut } from 'lucide-react';
+import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity } from '../services/api';
+import { Activity, Trash2, ExternalLink, RefreshCw, LogOut, PlusCircle, X } from 'lucide-react';
 
 export default function AdminDashboard() {
     const navigate = useNavigate();
@@ -14,6 +14,11 @@ export default function AdminDashboard() {
     const [totalPages, setTotalPages] = useState(1);
     const [isScrapingAll, setIsScrapingAll] = useState(false);
     const [scrapeProgress, setScrapeProgress] = useState(null);
+    const [showModal, setShowModal] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formData, setFormData] = useState({
+        title: '', description: '', deadline: '', eligibility: '', url: '', type: 'Competition', status: 'Live', organizationId: ''
+    });
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -110,6 +115,22 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleModalSubmit = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        try {
+            await createOpportunity(formData);
+            showToast('Successfully added manual opportunity.');
+            setShowModal(false);
+            setFormData({ title: '', description: '', deadline: '', eligibility: '', url: '', type: 'Competition', status: 'Live', organizationId: '' });
+            fetchData();
+        } catch (err) {
+            showToast('Failed to add opportunity: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const logout = () => {
         localStorage.removeItem('token');
         navigate('/admin/login');
@@ -198,6 +219,12 @@ export default function AdminDashboard() {
                             <h2 className="font-bold text-slate-800">Recent Opportunities</h2>
                             <p className="text-xs text-slate-500 mt-1">Showing up to 100 entries per page.</p>
                         </div>
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-ieee-blue text-white hover:bg-blue-700 shadow-sm flex items-center gap-2"
+                        >
+                            <PlusCircle size={16} /> Add Manual
+                        </button>
                     </div>
 
                     <div className="overflow-x-auto overflow-y-auto flex-grow">
@@ -265,6 +292,92 @@ export default function AdminDashboard() {
                 </div>
 
             </div>
+
+            {/* Manual Entry Modal */}
+            {showModal && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <h2 className="text-xl font-bold text-slate-800">Add Manual Opportunity</h2>
+                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-full border border-slate-200 shadow-sm transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleModalSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1 md:col-span-2">
+                                    <label className="text-sm font-semibold text-slate-700">Organization / Society <span className="text-red-500">*</span></label>
+                                    <select
+                                        required
+                                        className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white"
+                                        value={formData.organizationId}
+                                        onChange={(e) => setFormData({ ...formData, organizationId: e.target.value })}
+                                    >
+                                        <option value="">Select an organization...</option>
+                                        {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1 md:col-span-2">
+                                    <label className="text-sm font-semibold text-slate-700">Title <span className="text-red-500">*</span></label>
+                                    <input type="text" required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g. IEEE Global Student Hardware Competition" />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-sm font-semibold text-slate-700">Type <span className="text-red-500">*</span></label>
+                                    <select required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
+                                        <option value="Competition">Competition</option>
+                                        <option value="Hackathon">Hackathon</option>
+                                        <option value="Grant">Grant</option>
+                                        <option value="Paper Contest">Paper Contest</option>
+                                        <option value="Fellowship">Fellowship</option>
+                                        <option value="Scholarship">Scholarship</option>
+                                        <option value="Workshop">Workshop</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-sm font-semibold text-slate-700">Status <span className="text-red-500">*</span></label>
+                                    <select required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
+                                        <option value="Live">Live</option>
+                                        <option value="Upcoming">Upcoming</option>
+                                        <option value="Closed">Closed</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-sm font-semibold text-slate-700">Deadline (Optional)</label>
+                                    <input type="date" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.deadline} onChange={e => setFormData({ ...formData, deadline: e.target.value })} />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-sm font-semibold text-slate-700">Official Link (Optional)</label>
+                                    <input type="url" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.url} onChange={e => setFormData({ ...formData, url: e.target.value })} placeholder="https://..." />
+                                </div>
+
+                                <div className="space-y-1 md:col-span-2">
+                                    <label className="text-sm font-semibold text-slate-700">Description <span className="text-red-500">*</span></label>
+                                    <textarea required rows="3" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the opportunity..."></textarea>
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <label className="text-sm font-semibold text-slate-700">Eligibility (Optional)</label>
+                                    <textarea rows="2" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.eligibility} onChange={e => setFormData({ ...formData, eligibility: e.target.value })} placeholder="Who can apply?"></textarea>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
+                                <button type="button" onClick={() => setShowModal(false)} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+                                <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-ieee-blue text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
+                                    {isSubmitting ? <RefreshCw size={18} className="animate-spin" /> : <PlusCircle size={18} />}
+                                    {isSubmitting ? 'Saving...' : 'Save Opportunity'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
