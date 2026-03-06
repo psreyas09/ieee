@@ -49,7 +49,7 @@ const societies = [
 const councils = [
     { name: 'Biometrics Council', web: 'https://ieee-biometrics.org' },
     { name: 'Council on Electronic Design Automation (CEDA)', web: 'https://ieee-ceda.org' },
-    { name: 'Nanotechnology Council', web: 'https://ieee-nano.org' },
+    { name: 'Nanotechnology Council', web: 'https://ieeenano.org/' },
     { name: 'Council on RFID (CRFID)', web: 'https://ieee-rfid.org/' },
     { name: 'Sensors Council', web: 'https://ieee-sensors.org' },
     { name: 'Council on Superconductivity', web: 'https://ieeecsc.org' },
