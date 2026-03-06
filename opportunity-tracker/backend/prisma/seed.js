@@ -34,7 +34,7 @@ const societies = [
     { name: 'Power Electronics', web: 'https://ieee-pels.org' },
     { name: 'Power & Energy', web: 'https://ieee-pes.org' },
     { name: 'Product Safety Engineering', web: 'https://pses.ieee.org' },
-    { name: 'Professional Communication', web: 'https://ieeepcs.org' },
+    { name: 'Professional Communication', web: 'https://procomm.ieee.org/' },
     { name: 'Reliability', web: 'https://rs.ieee.org' },
     { name: 'Robotics and Automation', web: 'https://ieee-ras.org' },
     { name: 'Signal Processing', web: 'https://signalprocessingsociety.org' },
