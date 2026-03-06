@@ -12,6 +12,8 @@ export default function AdminDashboard() {
     const [toast, setToast] = useState('');
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [isScrapingAll, setIsScrapingAll] = useState(false);
+    const [scrapeProgress, setScrapeProgress] = useState(null);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -65,6 +67,38 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleScrapeAll = async () => {
+        if (!confirm('This will sequentially scrape all organizations. It may take several minutes. Ensure your browser stays open. Proceed?')) return;
+
+        setIsScrapingAll(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < orgs.length; i++) {
+            const org = orgs[i];
+            setScrapeProgress({ current: i + 1, total: orgs.length, name: org.name });
+
+            try {
+                setScrapingId(org.id);
+                const result = await triggerScrape(org.id);
+                successCount++;
+                console.log(`Success scraping ${org.name}:`, result);
+            } catch (error) {
+                failCount++;
+                console.error(`Failed scraping ${org.name}:`, error);
+            }
+
+            // Wait 2 seconds between scrapes to respect Gemini rate limits
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+
+        setScrapingId(null);
+        setScrapeProgress(null);
+        setIsScrapingAll(false);
+        showToast(`Scrape All Complete! Success: ${successCount}, Failed: ${failCount}`);
+        fetchData();
+    };
+
     const handleDelete = async (id) => {
         if (!confirm('Are you sure you want to delete this opportunity?')) return;
         try {
@@ -106,10 +140,33 @@ export default function AdminDashboard() {
 
                 {/* Left Col - Organizations Scraper */}
                 <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px]">
-                    <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                        <h2 className="font-bold text-slate-800">Trigger Scraping</h2>
-                        <p className="text-xs text-slate-500 mt-1">Free-tier safe calls to Gemini API.</p>
+                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <div>
+                            <h2 className="font-bold text-slate-800">Trigger Scraping</h2>
+                            <p className="text-xs text-slate-500 mt-1">Free-tier safe calls to Gemini API.</p>
+                        </div>
+                        <button
+                            onClick={handleScrapeAll}
+                            disabled={isScrapingAll || scrapingId !== null}
+                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${isScrapingAll ? 'bg-slate-200 text-slate-500' : 'bg-ieee-blue text-white hover:bg-blue-700 shadow-sm'}`}
+                        >
+                            {isScrapingAll ? 'Scraping...' : 'Scrape All'}
+                        </button>
                     </div>
+
+                    {isScrapingAll && scrapeProgress && (
+                        <div className="bg-blue-50 border-b border-blue-100 p-3 text-sm text-blue-800">
+                            <div className="flex justify-between mb-1">
+                                <span className="font-semibold">Sequential Scraping</span>
+                                <span>{scrapeProgress.current} / {scrapeProgress.total}</span>
+                            </div>
+                            <div className="w-full bg-blue-200 rounded-full h-1.5 mb-2">
+                                <div className="bg-ieee-blue h-1.5 rounded-full transition-all duration-300" style={{ width: `${(scrapeProgress.current / scrapeProgress.total) * 100}%` }}></div>
+                            </div>
+                            <p className="text-xs truncate">Current: {scrapeProgress.name}</p>
+                        </div>
+                    )}
+
                     <div className="overflow-y-auto flex-grow p-4 space-y-3">
                         {orgs.map(org => (
                             <div key={org.id} className="border border-slate-200 rounded-lg p-3 hover:border-ieee-blue/30 transition-colors">
@@ -122,8 +179,8 @@ export default function AdminDashboard() {
                                     </div>
                                     <button
                                         onClick={() => handleScrape(org.id, org.name)}
-                                        disabled={scrapingId === org.id}
-                                        className={`p-2 rounded-md ${scrapingId === org.id ? 'bg-slate-100 text-slate-400' : 'bg-ieee-blue/10 text-ieee-blue hover:bg-ieee-blue hover:text-white'} transition-colors`}
+                                        disabled={scrapingId !== null || isScrapingAll}
+                                        className={`p-2 rounded-md ${scrapingId === org.id ? 'bg-slate-100 text-slate-400' : isScrapingAll ? 'bg-slate-50 text-slate-300' : 'bg-ieee-blue/10 text-ieee-blue hover:bg-ieee-blue hover:text-white'} transition-colors`}
                                         title="Fetch & Analyze"
                                     >
                                         <RefreshCw size={16} className={scrapingId === org.id ? 'animate-spin' : ''} />
