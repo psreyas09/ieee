@@ -32,7 +32,7 @@ export default function AdminDashboard() {
             ]);
             setOrgs(orgsData);
             setOpps(oppsData.data);
-            setTotalPages(oppsData.totalPages || 1);
+            setTotalPages(oppsData.pagination?.totalPages || 1);
         } catch (err) {
             if (err.response?.status === 401) {
                 localStorage.removeItem('token');
