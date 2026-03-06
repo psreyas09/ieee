@@ -10,7 +10,7 @@ const societies = [
     { name: 'Broadcast Technology', web: 'https://ieee-bts.org' },
     { name: 'Circuits and Systems', web: 'https://ieee-cas.org' },
     { name: 'Communications', web: 'https://comsoc.org' },
-    { name: 'Computational Intelligence', web: 'https://ieee-cis.org' },
+    { name: 'Computational Intelligence', web: 'https://cis.ieee.org/' },
     { name: 'Computer', web: 'https://computer.org' },
     { name: 'Consumer Technology', web: 'https://ctsoc.ieee.org/' },
     { name: 'Control Systems', web: 'https://ieeecss.org' },
