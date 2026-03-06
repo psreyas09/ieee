@@ -189,10 +189,10 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
 
         if (!organization) return res.status(404).json({ error: 'Organization not found' });
 
-        // Check simple cooldown (1 hour)
+        // Check simple cooldown (10 minutes)
         if (organization.lastScrapedAt) {
-            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-            if (organization.lastScrapedAt > oneHourAgo) {
+            const cooldownTime = new Date(Date.now() - 10 * 60 * 1000);
+            if (organization.lastScrapedAt > cooldownTime) {
                 return res.status(429).json({ error: 'Cooldown active. Try again later.' });
             }
         }
