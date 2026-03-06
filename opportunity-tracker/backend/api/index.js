@@ -226,6 +226,11 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
                     }
                 }
 
+                let finalStatus = opp.status || 'Live';
+                if (parsedDate && parsedDate < new Date()) {
+                    finalStatus = 'Closed';
+                }
+
                 await prisma.opportunity.create({
                     data: {
                         title: opp.title,
@@ -234,7 +239,7 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
                         eligibility: opp.eligibility,
                         url: opp.url || organization.officialWebsite,
                         type: opp.type || 'Other',
-                        status: opp.status || 'Live',
+                        status: finalStatus,
                         source: 'auto',
                         organizationId: orgId,
                         lastFetchedAt: new Date()
@@ -250,12 +255,20 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
                         parsedDate = dt;
                     }
                 }
+
+                let finalStatus = opp.status || existing.status;
+                if (parsedDate && parsedDate < new Date()) {
+                    finalStatus = 'Closed';
+                } else if (!parsedDate && existing.deadline && existing.deadline < new Date()) {
+                    finalStatus = 'Closed';
+                }
+
                 await prisma.opportunity.update({
                     where: { id: existing.id },
                     data: {
                         lastFetchedAt: new Date(),
                         deadline: parsedDate || existing.deadline,
-                        status: opp.status || existing.status,
+                        status: finalStatus,
                         url: opp.url || existing.url
                     }
                 });
