@@ -14,7 +14,7 @@ const societies = [
     { name: 'Computer', web: 'https://computer.org' },
     { name: 'Consumer Technology', web: 'https://ctsoc.ieee.org/' },
     { name: 'Control Systems', web: 'https://ieeecss.org' },
-    { name: 'Dielectrics and Electrical Insulation', web: 'https://deis.org/' },
+    { name: 'Dielectrics and Electrical Insulation', web: 'https://ieeedeis.org/' },
     { name: 'Education', web: 'https://ieee-edusociety.org' },
     { name: 'Electromagnetic Compatibility', web: 'https://www.emcs.org/' },
     { name: 'Electron Devices', web: 'https://ieee-eds.org' },
