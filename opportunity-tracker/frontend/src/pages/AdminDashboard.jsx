@@ -10,6 +10,8 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [scrapingId, setScrapingId] = useState(null);
     const [toast, setToast] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -18,16 +20,17 @@ export default function AdminDashboard() {
             return;
         }
         fetchData();
-    }, [navigate]);
+    }, [navigate, page]);
 
     const fetchData = async () => {
         try {
             const [orgsData, oppsData] = await Promise.all([
                 getOrganizations(),
-                getOpportunities({ limit: 100 })
+                getOpportunities({ limit: 100, page })
             ]);
             setOrgs(orgsData);
             setOpps(oppsData.data);
+            setTotalPages(oppsData.totalPages || 1);
         } catch (err) {
             if (err.response?.status === 401) {
                 localStorage.removeItem('token');
@@ -136,7 +139,7 @@ export default function AdminDashboard() {
                     <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                         <div>
                             <h2 className="font-bold text-slate-800">Recent Opportunities</h2>
-                            <p className="text-xs text-slate-500 mt-1">Showing last 100 entries.</p>
+                            <p className="text-xs text-slate-500 mt-1">Showing up to 100 entries per page.</p>
                         </div>
                     </div>
 
@@ -183,6 +186,24 @@ export default function AdminDashboard() {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                    {/* Pagination Controls */}
+                    <div className="p-4 border-t border-slate-100 flex justify-between items-center bg-slate-50/50 mt-auto">
+                        <button
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                        >
+                            Previous
+                        </button>
+                        <span className="text-sm font-medium text-slate-600">Page {page} of {totalPages}</span>
+                        <button
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            disabled={page === totalPages}
+                            className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                        >
+                            Next
+                        </button>
                     </div>
                 </div>
 
