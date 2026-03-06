@@ -16,7 +16,7 @@ const societies = [
     { name: 'Control Systems', web: 'https://ieeecss.org' },
     { name: 'Dielectrics and Electrical Insulation', web: 'https://deis.org/' },
     { name: 'Education', web: 'https://ieee-edusociety.org' },
-    { name: 'Electromagnetic Compatibility', web: 'https://ieeeemc.org' },
+    { name: 'Electromagnetic Compatibility', web: 'https://www.emcs.org/' },
     { name: 'Electron Devices', web: 'https://ieee-eds.org' },
     { name: 'Electronics Packaging', web: 'https://eps.ieee.org/' },
     { name: 'Engineering in Medicine and Biology', web: 'https://embs.org' },
