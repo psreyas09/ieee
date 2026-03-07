@@ -106,7 +106,10 @@ app.get('/api/opportunities', async (req, res) => {
             prisma.opportunity.findMany({
                 where,
                 include: { organization: true },
-                orderBy: { deadline: 'asc' }, // Defaults to soonest first
+                orderBy: [
+                    { deadline: 'asc' },
+                    { id: 'asc' }
+                ],
                 skip,
                 take: limitNum,
             }),

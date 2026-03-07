@@ -25,7 +25,11 @@ export default function Opportunities() {
             const data = await getOpportunities({ search, organizationId: orgId, type, status, limit: 50, page: pageNum });
 
             if (isLoadMore) {
-                setOpportunities(prev => [...prev, ...data.data]);
+                setOpportunities(prev => {
+                    const existingIds = new Set(prev.map(p => p.id));
+                    const newItems = data.data.filter(d => !existingIds.has(d.id));
+                    return [...prev, ...newItems];
+                });
             } else {
                 setOpportunities(data.data);
             }
