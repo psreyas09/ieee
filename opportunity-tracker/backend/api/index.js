@@ -207,14 +207,26 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
         }
 
         function calculateSimilarity(str1, str2) {
-            const s1 = str1.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
-            const s2 = str2.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+            const stopWords = new Set(['ieee', 'the', 'and', 'for', 'program', 'council', 'society', 'chapter', 'section', 'award', 'awards']);
+
+            const processStr = (str) => {
+                return str.toLowerCase()
+                    .replace(/[^a-z0-9\s]/g, '')
+                    .split(/\s+/)
+                    .filter(w => w.length > 2 && !stopWords.has(w))
+                    .map(w => w.endsWith('s') ? w.slice(0, -1) : w);
+            };
+
+            const s1 = processStr(str1);
+            const s2 = processStr(str2);
             if (s1.length === 0 || s2.length === 0) return 0;
+
             const set1 = new Set(s1);
             const set2 = new Set(s2);
             let intersection = 0;
             for (let word of set1) { if (set2.has(word)) intersection++; }
-            return intersection / (set1.size + set2.size - intersection);
+
+            return intersection / Math.min(set1.size, set2.size);
         }
 
         // Upsert logic for extracted opportunities
