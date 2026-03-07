@@ -206,19 +206,36 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
             return res.status(500).json({ error: 'Failed to process AI output', raw: result.raw });
         }
 
+        function calculateSimilarity(str1, str2) {
+            const s1 = str1.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+            const s2 = str2.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+            if (s1.length === 0 || s2.length === 0) return 0;
+            const set1 = new Set(s1);
+            const set2 = new Set(s2);
+            let intersection = 0;
+            for (let word of set1) { if (set2.has(word)) intersection++; }
+            return intersection / (set1.size + set2.size - intersection);
+        }
+
         // Upsert logic for extracted opportunities
         const opportunities = result.data;
         let addedCount = 0;
 
-        // Add logic to avoid recreating duplicates if exact title for same org already exists
+        // Fetch all existing active opportunities for deterministic fuzzy comparison
+        const allExistingForOrg = await prisma.opportunity.findMany({
+            where: { organizationId: orgId, status: { not: 'Closed' } }
+        });
+
+        // Add logic to avoid recreating duplicates if exact or highly similar title already exists
         for (const opp of opportunities) {
-            // Only live or upcoming entries are generally scraped with deadlines etc.
-            const existing = await prisma.opportunity.findFirst({
-                where: {
-                    title: opp.title,
-                    organizationId: orgId
+            // Find semantic match instead of exact
+            let existing = null;
+            for (const record of allExistingForOrg) {
+                if (calculateSimilarity(opp.title, record.title) > 0.5) {
+                    existing = record;
+                    break;
                 }
-            });
+            }
 
             if (!existing) {
                 let parsedDate = null;
