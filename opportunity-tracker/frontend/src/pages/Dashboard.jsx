@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Activity, TrendingUp, Users, AlertCircle } from 'lucide-react';
 import { getStats, getOpportunities } from '../services/api';
 import OpportunityCard from '../components/OpportunityCard';
+import HeroGlobe from '../components/HeroGlobe';
 
 export default function Dashboard() {
     const [stats, setStats] = useState(null);
@@ -39,20 +40,19 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <section className="bg-gradient-to-r from-ieee-navy to-[#0f2342] rounded-2xl p-8 text-white shadow-lg relative overflow-hidden w-full">
-                <div className="absolute top-0 right-0 opacity-10 transform translate-x-1/4 -translate-y-1/4">
-                    <svg width="400" height="400" viewBox="0 0 100 100" fill="white" xmlns="http://www.w3.org/2000/svg">
-                        <polygon points="50 0, 100 25, 100 75, 50 100, 0 75, 0 25" />
-                    </svg>
-                </div>
+            <section className="bg-gradient-to-r from-ieee-navy to-[#0f2342] rounded-2xl p-8 md:p-12 text-white shadow-lg relative overflow-hidden w-full flex flex-col md:flex-row items-center justify-between min-h-[400px]">
                 <div className="relative z-10 max-w-2xl">
-                    <h2 className="text-3xl md:text-4xl font-extrabold mb-4 tracking-tight">Discover Your Next Big Opportunity</h2>
-                    <p className="text-lg md:text-xl text-slate-300 mb-8 leading-relaxed">
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold mb-4 tracking-tight leading-tight">Discover Your Next <br className="hidden md:block" /> Big Opportunity</h2>
+                    <p className="text-lg md:text-xl text-slate-300 mb-8 leading-relaxed max-w-xl">
                         Welcome to the global centralized hub for IEEE student members. Find hackathons, paper contests, and grants curated specifically for you.
                     </p>
-                    <Link to="/opportunities" className="inline-flex items-center gap-2 bg-ieee-blue hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-md">
+                    <Link to="/opportunities" className="inline-flex items-center gap-2 bg-ieee-blue hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-md">
                         Browse All Opportunities <ArrowRight size={20} />
                     </Link>
+                </div>
+
+                <div className="hidden md:flex relative z-10 w-[400px] h-[400px] flex-shrink-0 items-center justify-center">
+                    <HeroGlobe />
                 </div>
             </section>
 
