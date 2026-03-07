@@ -7,6 +7,9 @@ export default function Opportunities() {
     const [opportunities, setOpportunities] = useState([]);
     const [orgs, setOrgs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     // Filters
     const [search, setSearch] = useState('');
@@ -14,15 +17,26 @@ export default function Opportunities() {
     const [type, setType] = useState('');
     const [status, setStatus] = useState('Live');
 
-    const fetchOpps = async () => {
-        setLoading(true);
+    const fetchOpps = async (pageNum = 1, isLoadMore = false) => {
+        if (!isLoadMore) setLoading(true);
+        else setLoadingMore(true);
+
         try {
-            const data = await getOpportunities({ search, organizationId: orgId, type, status, limit: 50 });
-            setOpportunities(data.data);
+            const data = await getOpportunities({ search, organizationId: orgId, type, status, limit: 50, page: pageNum });
+
+            if (isLoadMore) {
+                setOpportunities(prev => [...prev, ...data.data]);
+            } else {
+                setOpportunities(data.data);
+            }
+
+            setHasMore(pageNum < (data.pagination?.totalPages || 1));
+            setPage(pageNum);
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
     };
 
@@ -33,10 +47,16 @@ export default function Opportunities() {
     useEffect(() => {
         // Debounce search
         const delay = setTimeout(() => {
-            fetchOpps();
+            fetchOpps(1, false);
         }, 500);
         return () => clearTimeout(delay);
     }, [search, orgId, type, status]);
+
+    const handleLoadMore = () => {
+        if (!loadingMore && hasMore) {
+            fetchOpps(page + 1, true);
+        }
+    };
 
     const types = ["Competition", "Paper Contest", "Grant", "Hackathon", "Fellowship", "Workshop", "Webinar", "Other"];
 
@@ -102,8 +122,26 @@ export default function Opportunities() {
                     ))}
                 </div>
             ) : opportunities.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {opportunities.map(opp => <OpportunityCard key={opp.id} opportunity={opp} />)}
+                <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {opportunities.map(opp => <OpportunityCard key={opp.id} opportunity={opp} />)}
+                    </div>
+
+                    {hasMore && (
+                        <div className="flex justify-center pt-8 pb-4">
+                            <button
+                                onClick={handleLoadMore}
+                                disabled={loadingMore}
+                                className="px-6 py-2.5 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {loadingMore ? (
+                                    <><div className="w-5 h-5 border-2 border-slate-300 border-t-ieee-blue rounded-full animate-spin"></div> Loading...</>
+                                ) : (
+                                    'Load More Opportunities'
+                                )}
+                            </button>
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="text-center py-20 bg-white rounded-xl border border-slate-200">
