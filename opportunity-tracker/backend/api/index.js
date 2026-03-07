@@ -51,9 +51,7 @@ app.get('/api/stats', async (req, res) => {
             }
         });
 
-        const societiesCovered = await prisma.organization.count({
-            where: { type: 'society' }
-        });
+        const societiesCovered = await prisma.organization.count();
 
         res.json({
             totalOpportunities,
