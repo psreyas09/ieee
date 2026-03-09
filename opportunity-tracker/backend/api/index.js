@@ -318,6 +318,125 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Automated Cron Scraper (Hourly Batch)
+// To be triggered by Vercel Cron Jobs. Secured via CRON_SECRET.
+app.get('/api/cron/scrape-batch', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        const cronSecret = process.env.CRON_SECRET;
+
+        if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+            return res.status(401).json({ error: 'Unauthorized CRON request' });
+        }
+
+        // Fetch the 2 oldest scraped organizations (null first)
+        const organizations = await prisma.organization.findMany({
+            orderBy: { lastScrapedAt: 'asc' }, // nulls are treated as first/oldest in Postgres asc
+            take: 2
+        });
+
+        if (organizations.length === 0) {
+            return res.json({ message: 'No organizations found to scrape.' });
+        }
+
+        const results = [];
+        for (const org of organizations) {
+            try {
+                // Shared logic block for processing one org
+                const result = await scrapeOrganization(org);
+
+                if (!result.success) {
+                    results.push({ org: org.name, status: 'failed', error: result.error });
+                    continue;
+                }
+
+                // Subset matching logic
+                function calculateSimilarity(str1, str2) {
+                    const stopWords = new Set(['ieee', 'the', 'and', 'for', 'program', 'council', 'society', 'chapter', 'section', 'award', 'awards']);
+                    const processStr = (str) => str.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w)).map(w => w.endsWith('s') ? w.slice(0, -1) : w);
+                    const s1 = processStr(str1);
+                    const s2 = processStr(str2);
+                    if (s1.length === 0 || s2.length === 0) return 0;
+                    const set1 = new Set(s1);
+                    const set2 = new Set(s2);
+                    let intersection = 0;
+                    for (let word of set1) { if (set2.has(word)) intersection++; }
+                    return intersection / Math.min(set1.size, set2.size);
+                }
+
+                const opportunities = result.data;
+                let addedCount = 0;
+
+                const allExistingForOrg = await prisma.opportunity.findMany({
+                    where: { organizationId: org.id, status: { not: 'Closed' } }
+                });
+
+                for (const opp of opportunities) {
+                    let existing = null;
+                    for (const record of allExistingForOrg) {
+                        if (calculateSimilarity(opp.title, record.title) > 0.5) {
+                            existing = record;
+                            break;
+                        }
+                    }
+
+                    let parsedDate = opp.deadline ? new Date(opp.deadline) : null;
+                    if (parsedDate && isNaN(parsedDate.getTime())) parsedDate = null;
+
+                    let finalStatus = opp.status || (existing ? existing.status : 'Live');
+                    if (parsedDate && parsedDate < new Date()) finalStatus = 'Closed';
+                    else if (!parsedDate && existing && existing.deadline && existing.deadline < new Date()) finalStatus = 'Closed';
+
+                    if (!existing) {
+                        await prisma.opportunity.create({
+                            data: {
+                                title: opp.title,
+                                description: opp.description || '',
+                                deadline: parsedDate,
+                                eligibility: opp.eligibility,
+                                url: opp.url || org.officialWebsite,
+                                type: opp.type || 'Other',
+                                status: finalStatus,
+                                source: 'auto',
+                                organizationId: org.id,
+                                lastFetchedAt: new Date()
+                            }
+                        });
+                        addedCount++;
+                    } else {
+                        await prisma.opportunity.update({
+                            where: { id: existing.id },
+                            data: {
+                                lastFetchedAt: new Date(),
+                                deadline: parsedDate || existing.deadline,
+                                status: finalStatus,
+                                url: opp.url || existing.url
+                            }
+                        });
+                    }
+                }
+
+                await prisma.organization.update({
+                    where: { id: org.id },
+                    data: { lastScrapedAt: new Date() }
+                });
+
+                results.push({ org: org.name, status: 'success', added: addedCount });
+
+            } catch (err) {
+                console.error(`Cron error scraping ${org.name}:`, err);
+                results.push({ org: org.name, status: 'failed', error: err.message });
+            }
+        }
+
+        res.json({ message: 'Batch cron scrape completed', results });
+
+    } catch (error) {
+        console.error('Cron system error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Admin manual operations
 app.post('/api/admin/opportunities', authenticateAdmin, async (req, res) => {
     try {

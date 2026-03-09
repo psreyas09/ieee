@@ -26,5 +26,11 @@
             "src": "/(.*)",
             "dest": "/frontend/$1"
         }
+    ],
+    "crons": [
+        {
+            "path": "/api/cron/scrape-batch",
+            "schedule": "0 * * * *"
+        }
     ]
 }
