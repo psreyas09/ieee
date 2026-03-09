@@ -57,21 +57,42 @@ async function fetchAndExtractText(url) {
 async function analyzeWithGemini(text) {
     const prompt = `From the following webpage text, extract all student competitions, paper contests, grants, hackathons, fellowships, workshops or any opportunities relevant to IEEE student members. Return ONLY a valid JSON array with no extra text, no preamble, no markdown. Each object must have: title (string), description (string 2-3 sentences), deadline (ISO 8601 date string or null), eligibility (string), url (string or null), type (one of: Competition, Paper Contest, Grant, Hackathon, Fellowship, Workshop, Webinar, Other), status (one of: Live, Upcoming, Closed). Webpage text: ${text}`;
 
-    // Helper to call a specific model and parse
-    const tryModel = async (modelName) => {
-        const response = await ai.models.generateContent({
-            model: modelName,
-            contents: prompt
-        });
+    // Helper to call a specific model and parse with intelligent 503/429 retries
+    const tryModel = async (modelName, retries = 3) => {
+        let lastError;
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                const response = await ai.models.generateContent({
+                    model: modelName,
+                    contents: prompt
+                });
 
-        const output = response.text;
-        const cleanJsonStr = output.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const opportunities = JSON.parse(cleanJsonStr);
+                const output = response.text;
+                const cleanJsonStr = output.replace(/```json/gi, '').replace(/```/g, '').trim();
+                const opportunities = JSON.parse(cleanJsonStr);
 
-        if (!Array.isArray(opportunities)) {
-            throw new Error("Output is not a JSON array.");
+                if (!Array.isArray(opportunities)) {
+                    throw new Error("Output is not a JSON array.");
+                }
+                return opportunities;
+            } catch (error) {
+                lastError = error;
+                const errMsg = error.message || '';
+                const isRetryable = error.status === 503 || error.status === 429 ||
+                    errMsg.includes('503') || errMsg.includes('429') ||
+                    errMsg.includes('UNAVAILABLE') || errMsg.includes('RESOURCE_EXHAUSTED') ||
+                    errMsg.includes('fetch failed');
+
+                if (isRetryable && attempt < retries) {
+                    const delayMs = attempt * 2500; // Incrementing backoff (2.5s, 5.0s)
+                    console.warn(`[Attempt ${attempt}/${retries}] Model ${modelName} returned Temporary Error (503/429), retrying in ${delayMs}ms...`);
+                    await wait(delayMs);
+                } else {
+                    throw error; // Not retryable or max retries reached, pass to outer fallback
+                }
+            }
         }
-        return opportunities;
+        throw lastError;
     };
 
     try {
