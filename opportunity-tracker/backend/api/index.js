@@ -335,10 +335,10 @@ app.get('/api/admin/force-seed', async (req, res) => {
                 }
             });
             addedCount++;
-        } else if (studentOrg.scrapeUrl !== 'https://students.ieee.org/') {
+        } else if (studentOrg.scrapeUrl !== 'https://www.ieee.org/membership/students/index.html') {
             await prisma.organization.update({
                 where: { id: studentOrg.id },
-                data: { scrapeUrl: 'https://students.ieee.org/' }
+                data: { scrapeUrl: 'https://www.ieee.org/membership/students/index.html' }
             });
         }
 
@@ -399,7 +399,7 @@ app.get('/api/cron/scrape-batch', async (req, res) => {
 
                 if (!result.success) {
                     results.push({ org: org.name, status: 'failed', error: result.error });
-                    continue;
+                    continue; // The finally block will still run and update the timestamp
                 }
 
                 // Subset matching logic
@@ -468,16 +468,20 @@ app.get('/api/cron/scrape-batch', async (req, res) => {
                     }
                 }
 
-                await prisma.organization.update({
-                    where: { id: org.id },
-                    data: { lastScrapedAt: new Date() }
-                });
-
                 results.push({ org: org.name, status: 'success', added: addedCount });
 
             } catch (err) {
                 console.error(`Cron error scraping ${org.name}:`, err);
                 results.push({ org: org.name, status: 'failed', error: err.message });
+            } finally {
+                // EXTREMELY IMPORTANT: We MUST update lastScrapedAt even if the scrape failed 
+                // due to bot protection (403), 404, or Gemini errors. 
+                // Otherwise this org will be stuck at the front of the queue forever, 
+                // creating an infinite failure loop that starves other orgs.
+                await prisma.organization.update({
+                    where: { id: org.id },
+                    data: { lastScrapedAt: new Date() }
+                });
             }
         }
 
