@@ -89,6 +89,15 @@ async function main() {
         }
     });
 
+    await prisma.organization.create({
+        data: {
+            name: 'IEEE Student Activities',
+            type: 'society', // Treat as abstract organization
+            officialWebsite: 'https://students.ieee.org/',
+            scrapeUrl: 'https://students.ieee.org/programs/' // more specific URL for student programs
+        }
+    });
+
     console.log('Organizations seeded. Creating logic...');
 
     const passwordHash = await bcrypt.hash('admin123', 10);
