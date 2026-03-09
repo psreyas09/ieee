@@ -100,7 +100,15 @@ async function analyzeWithGemini(text) {
         const opportunities = await tryModel('gemini-2.5-flash-lite');
         return { success: true, data: opportunities, raw: null };
     } catch (liteError) {
-        console.warn(`flash-lite failed: ${liteError.message}. Falling back to gemini-2.5-flash...`);
+        const errMsg = liteError.message || '';
+        const isQuotaError = liteError.status === 429 || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED');
+
+        if (isQuotaError) {
+            console.warn(`flash-lite quota/rate-limit hit. Aborting to protect flash quota.`);
+            return { success: false, data: null, raw: liteError.message, error: `Google AI Quota Exceeded (Please wait a minute): ${liteError.message}` };
+        }
+
+        console.warn(`flash-lite parsing failed: ${errMsg}. Falling back to gemini-2.5-flash...`);
         try {
             const opportunities = await tryModel('gemini-2.5-flash');
             return { success: true, data: opportunities, raw: null };
