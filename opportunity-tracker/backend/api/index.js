@@ -540,9 +540,31 @@ app.delete('/api/admin/opportunities/:id', authenticateAdmin, async (req, res) =
 app.put('/api/admin/organizations/:id', authenticateAdmin, async (req, res) => {
     try {
         const { scrapeUrl, name, officialWebsite } = req.body;
+
+        const isValidHttpUrl = (value) => {
+            try {
+                const parsed = new URL(value);
+                return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+            } catch {
+                return false;
+            }
+        };
+
+        if (typeof scrapeUrl === 'string' && scrapeUrl.trim() && !isValidHttpUrl(scrapeUrl.trim())) {
+            return res.status(400).json({ error: 'Invalid scrapeUrl. Must be a valid http(s) URL.' });
+        }
+
+        if (typeof officialWebsite === 'string' && officialWebsite.trim() && !isValidHttpUrl(officialWebsite.trim())) {
+            return res.status(400).json({ error: 'Invalid officialWebsite. Must be a valid http(s) URL.' });
+        }
+
         const org = await prisma.organization.update({
             where: { id: req.params.id },
-            data: { scrapeUrl, name, officialWebsite }
+            data: {
+                scrapeUrl: typeof scrapeUrl === 'string' ? scrapeUrl.trim() : undefined,
+                name: typeof name === 'string' ? name.trim() : undefined,
+                officialWebsite: typeof officialWebsite === 'string' ? officialWebsite.trim() : undefined
+            }
         });
         res.json(org);
     } catch (error) {

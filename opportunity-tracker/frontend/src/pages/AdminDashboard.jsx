@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity } from '../services/api';
-import { Activity, Trash2, ExternalLink, RefreshCw, LogOut, PlusCircle, X } from 'lucide-react';
+import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOrganization } from '../services/api';
+import { Activity, Trash2, ExternalLink, RefreshCw, LogOut, PlusCircle, X, Pencil } from 'lucide-react';
 
 export default function AdminDashboard() {
     const navigate = useNavigate();
@@ -115,6 +115,38 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleUpdateScrapeUrl = async (org) => {
+        const currentUrl = org.scrapeUrl || org.officialWebsite || '';
+        const nextUrl = prompt(`Update scrape URL for ${org.name}`, currentUrl);
+
+        if (nextUrl === null) return;
+
+        const cleaned = nextUrl.trim();
+        if (!cleaned) {
+            showToast('Scrape URL cannot be empty.');
+            return;
+        }
+
+        try {
+            const parsed = new URL(cleaned);
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+                showToast('Invalid URL: use http or https.');
+                return;
+            }
+        } catch {
+            showToast('Invalid URL format.');
+            return;
+        }
+
+        try {
+            await updateOrganization(org.id, { scrapeUrl: cleaned });
+            showToast('Scrape URL updated successfully.');
+            fetchData();
+        } catch (error) {
+            showToast('Failed to update scrape URL.');
+        }
+    };
+
     const handleModalSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -205,6 +237,14 @@ export default function AdminDashboard() {
                                         title="Fetch & Analyze"
                                     >
                                         <RefreshCw size={16} className={scrapingId === org.id ? 'animate-spin' : ''} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleUpdateScrapeUrl(org)}
+                                        disabled={scrapingId !== null || isScrapingAll}
+                                        className={`p-2 rounded-md ${scrapingId !== null || isScrapingAll ? 'bg-slate-50 text-slate-300' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} transition-colors`}
+                                        title="Edit Scrape URL"
+                                    >
+                                        <Pencil size={16} />
                                     </button>
                                 </div>
                             </div>
