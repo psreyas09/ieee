@@ -117,7 +117,7 @@ async function main() {
             name: 'IEEE Student Activities',
             type: 'society', // Treat as abstract organization
             officialWebsite: 'https://students.ieee.org/',
-            scrapeUrl: 'https://www.ieee.org/membership/students/index.html' // more robust scrape target
+            scrapeUrl: 'https://students.ieee.org/'
         }
     });
 

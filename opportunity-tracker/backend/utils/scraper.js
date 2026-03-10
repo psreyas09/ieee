@@ -124,13 +124,25 @@ async function scrapeOrganization(organization) {
         throw new Error('GEMINI_API_KEY is missing');
     }
 
-    const targetUrl = organization.scrapeUrl || organization.officialWebsite;
-    if (!targetUrl) {
+    const primaryUrl = organization.scrapeUrl || organization.officialWebsite;
+    if (!primaryUrl) {
         throw new Error(`Organization ${organization.name} has no URL configured to scrape.`);
     }
 
-    // 1. Fetch & strip text
-    const text = await fetchAndExtractText(targetUrl);
+    let text;
+    try {
+        text = await fetchAndExtractText(primaryUrl);
+    } catch (error) {
+        const canFallback = organization.scrapeUrl && organization.officialWebsite && organization.scrapeUrl !== organization.officialWebsite;
+        const is404 = (error.message || '').includes('status code 404');
+
+        if (!canFallback || !is404) {
+            throw error;
+        }
+
+        console.warn(`Primary scrape URL failed for ${organization.name}. Retrying with official website...`);
+        text = await fetchAndExtractText(organization.officialWebsite);
+    }
 
     // 2. Send to Gemini
     return await analyzeWithGemini(text);

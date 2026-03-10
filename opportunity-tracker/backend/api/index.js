@@ -335,10 +335,10 @@ app.get('/api/admin/force-seed', async (req, res) => {
                 }
             });
             addedCount++;
-        } else if (studentOrg.scrapeUrl !== 'https://www.ieee.org/membership/students/index.html') {
+        } else if (studentOrg.scrapeUrl !== 'https://students.ieee.org/') {
             await prisma.organization.update({
                 where: { id: studentOrg.id },
-                data: { scrapeUrl: 'https://www.ieee.org/membership/students/index.html' }
+                data: { scrapeUrl: 'https://students.ieee.org/' }
             });
         }
 
