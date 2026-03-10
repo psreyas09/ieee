@@ -223,29 +223,31 @@ export default function AdminDashboard() {
                     <div className="overflow-y-auto flex-grow p-4 space-y-3">
                         {orgs.map(org => (
                             <div key={org.id} className="border border-slate-200 rounded-lg p-3 hover:border-ieee-blue/30 transition-colors">
-                                <div className="flex justify-between items-start">
+                                <div className="flex justify-between items-center">
                                     <div>
                                         <p className="font-semibold text-sm text-slate-800">{org.name}</p>
                                         <p className="text-xs text-slate-500 mt-0.5">
                                             Last: {org.lastScrapedAt ? new Date(org.lastScrapedAt).toLocaleString() : 'Never'}
                                         </p>
                                     </div>
-                                    <button
-                                        onClick={() => handleScrape(org.id, org.name)}
-                                        disabled={scrapingId !== null || isScrapingAll}
-                                        className={`p-2 rounded-md ${scrapingId === org.id ? 'bg-slate-100 text-slate-400' : isScrapingAll ? 'bg-slate-50 text-slate-300' : 'bg-ieee-blue/10 text-ieee-blue hover:bg-ieee-blue hover:text-white'} transition-colors`}
-                                        title="Fetch & Analyze"
-                                    >
-                                        <RefreshCw size={16} className={scrapingId === org.id ? 'animate-spin' : ''} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleUpdateScrapeUrl(org)}
-                                        disabled={scrapingId !== null || isScrapingAll}
-                                        className={`p-2 rounded-md ${scrapingId !== null || isScrapingAll ? 'bg-slate-50 text-slate-300' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} transition-colors`}
-                                        title="Edit Scrape URL"
-                                    >
-                                        <Pencil size={16} />
-                                    </button>
+                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                        <button
+                                            onClick={() => handleScrape(org.id, org.name)}
+                                            disabled={scrapingId !== null || isScrapingAll}
+                                            className={`p-2 rounded-md ${scrapingId === org.id ? 'bg-slate-100 text-slate-400' : isScrapingAll ? 'bg-slate-50 text-slate-300' : 'bg-ieee-blue/10 text-ieee-blue hover:bg-ieee-blue hover:text-white'} transition-colors`}
+                                            title="Fetch & Analyze"
+                                        >
+                                            <RefreshCw size={16} className={scrapingId === org.id ? 'animate-spin' : ''} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleUpdateScrapeUrl(org)}
+                                            disabled={scrapingId !== null || isScrapingAll}
+                                            className={`p-2 rounded-md ${scrapingId !== null || isScrapingAll ? 'bg-slate-50 text-slate-300' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} transition-colors`}
+                                            title="Edit Scrape URL"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}
