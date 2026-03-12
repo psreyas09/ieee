@@ -1,5 +1,10 @@
 {
     "version": 2,
+    "functions": {
+        "backend/api/index.js": {
+            "maxDuration": 60
+        }
+    },
     "builds": [
         {
             "src": "frontend/package.json",

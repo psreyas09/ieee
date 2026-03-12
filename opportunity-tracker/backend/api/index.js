@@ -377,14 +377,18 @@ app.get('/api/cron/scrape-batch', async (req, res) => {
         const authHeader = req.headers.authorization;
         const cronSecret = process.env.CRON_SECRET;
 
-        if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+        if (!cronSecret) {
+            return res.status(500).json({ error: 'CRON_SECRET is missing in environment variables.' });
+        }
+
+        if (authHeader !== `Bearer ${cronSecret}`) {
             return res.status(401).json({ error: 'Unauthorized CRON request' });
         }
 
-        // Fetch the 2 oldest scraped organizations (null first)
+        // Fetch only 1 org per run to stay within serverless execution limits.
         const organizations = await prisma.organization.findMany({
             orderBy: { lastScrapedAt: 'asc' }, // nulls are treated as first/oldest in Postgres asc
-            take: 2
+            take: 1
         });
 
         if (organizations.length === 0) {
