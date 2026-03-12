@@ -1,71 +1,126 @@
 # IEEE Opportunity Tracker - System Documentation
 
-This document serves as the comprehensive guide to the architecture, frameworks, and inner workings of the IEEE Opportunity Tracker application.
+This document summarizes the current architecture, data flow, admin operations, and production runbook.
 
 ## Overview
 
-The IEEE Opportunity Tracker is a full-stack, AI-powered web platform designed to automatically aggregate student competitions, paper contests, grants, hackathons, and fellowships from various IEEE Societies and Councils. It replaces the manual effort of checking dozens of separate websites by providing a centralized, searchable, and visually appealing feed.
+IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student opportunities (competitions, grants, hackathons, paper contests, workshops, and related events) into one searchable feed.
 
-## Technology Stack
+## Architecture
 
-The application uses a **Monorepo** structure optimized for serverless deployment on **Vercel**.
+### Frontend
+- React + Vite + Tailwind CSS
+- React Router for app navigation
+- Axios client with JWT auth interceptor
+- Admin dashboard for scraping and manual data operations
 
-### Frontend (Client-Side)
-- **Framework:** React.js (via Vite)
-- **Language:** JavaScript
-- **Styling:** Tailwind CSS (for rapid, utility-first styling) + customized IEEE brand colors (IEEE Blue, Navy, Gold).
-- **Routing:** React Router DOM (for Multi-Page Application feel).
-- **Icons:** Lucide React (clean, consistent SVG icons).
-- **State Management:** React Hooks (`useState`, `useEffect`).
-- **Data Fetching:** Axios.
+### Backend
+- Node.js + Express exposed via Vercel serverless routes
+- Prisma ORM with PostgreSQL (Neon)
+- JWT-protected admin APIs
+- Scraper pipeline with Axios + Cheerio + Gemini models
 
-### Backend (Server-Side)
-- **Framework:** Node.js with Express.js.
-- **Architecture:** Serverless Functions (Each API endpoint is executed statelessly on Vercel's Edge network).
-- **Database:** PostgreSQL (Hosted on Neon.tech).
-- **ORM (Object-Relational Mapping):** Prisma (for type-safe schema modeling and database migrations).
-- **AI Processing:** Google Gemini API (`gemini-2.5-flash-lite` with fallback to `gemini-2.5-flash`).
-- **Web Scraping:** Axios + Cheerio (for lightweight HTML DOM parsing).
-- **Authentication:** JWT (JSON Web Tokens) for securing the Admin Panel.
+### Database Models
+- `Organization`: source entities and scrape metadata (`scrapeUrl`, `officialWebsite`, `lastScrapedAt`)
+- `Opportunity`: scraped and manual opportunities
+- `AdminUser`: admin authentication records
 
-## How It Works (The Core Loop)
+## Scraping Pipeline
 
-The signature feature of this platform is the automated AI scraping backend.
+### Ingestion flow
+1. Choose target URL: `scrapeUrl` first, fallback to `officialWebsite`.
+2. Fetch HTML with browser-like headers.
+3. Remove non-content tags and extract body text.
+4. Limit extracted content length for model safety.
+5. Prompt Gemini for strict JSON output.
+6. Parse and upsert opportunities.
 
-### 1. Database Seed
-The `Organization` table in the database is pre-seeded with 47 IEEE entities (39 technical societies, 8 technical councils, and IEEE headquarters). Each organization record has an `officialWebsite` and a targeted `scrapeUrl` (often a specific 'Student Resources' or 'Competitions' sub-page).
+### Model strategy
+- Primary: `gemini-2.5-flash-lite`
+- Fallback: `gemini-2.5-flash`
+- Retry logic for temporary errors (`429`, `503`, transient fetch errors)
 
-### 2. The Scraping Process (`/utils/scraper.js`)
-When a scrape is triggered (either manually via the Admin Dashboard or via the automated "Scrape All" loop):
+### Deduplication
+- Title similarity uses normalized token overlap with stop-word filtering.
+- Near-duplicate opportunities are updated instead of duplicated.
 
-1. **HTML Fetching:** The backend uses `axios` to download the raw HTML of an organization's `scrapeUrl`. It uses custom User-Agents and header cloaking to avoid simple bot protections.
-2. **Noise Reduction:** `cheerio` parses the HTML array. It deliberately strips out `nav`, `footer`, `script`, and `style` tags, extracting only pure, raw text strings from the `<body>`.
-3. **Token Limiting:** The raw text is trimmed to a maximum of 12,000 characters to fit cleanly inside an AI context window without risking truncation timeouts or excessive token cost.
-4. **AI Generation (Gemini):** The raw text is passed to Google's Gemini models with a strict, engineered prompt: *"Extract student competitions... Return ONLY a valid JSON array..."*.
-5. **Fallback System:** The request hits the blazing fast `flash-lite` model first. If it fails, errors, or hallucinates bad JSON, it automatically falls back to the heavier `flash` model.
+## Admin Capabilities
 
-### 3. Data Upserting & Semantic Deduplication
-Once Gemini returns structured JSON (title, deadline, type, description, etc.):
-1. **Semantic Match:** The backend doesn't trust exact string matching because Gemini is non-deterministic (e.g., "Annual Design Contest" vs "Student Design Contest"). It runs a custom linguistic mathematically algorithm (`calculateSimilarity`) using **Word Subset Inclusion** combined with an intelligent exclusion of stop-words (like 'IEEE', 'Council', 'the', etc.).
-2. **Upsert or Create:** If the semantic engine calculates a >50% word overlap with an existing DB entry, it updates the existing entry (Upsert) to prevent bloated duplicate rows. Otherwise, it creates a new entry.
-3. **Auto-Closure Setup:** Any opportunity scraped with a `deadline` in the past is automatically assigned the `Closed` status in the DB, bypassing "Live" entirely.
+- Secure login via JWT (`/api/admin/login`)
+- Trigger scrape per organization (`/api/admin/scrape/:id`)
+- Sequential "Scrape All" from UI
+- CRUD for manual opportunities
+- Update organization data (`/api/admin/organizations/:id`)
+- Edit scrape URL directly in dashboard UI (pencil action)
 
-## Admin Features
+## Recent Reliability and UX Additions
 
-The site contains a highly protected `/admin` portal secured through JWT tokens. Passwords are hash-encrypted using `bcryptjs`.
-1. **Direct Scrapes**: Admins can hit a 'Scrape' button next to any society to force an immediate Gemini fetch.
-2. **Scrape All**: An automated programmatic UI loop that sequentially hits every organization. It enforces 2-second rate-limiting delays locally to respect Google Gemini quota limits and triggers individual separate API calls per society to cleanly bypass Vercel's strict 10-second serverless execution timeouts.
-3. **Manual Entry Modal:** If a competition is hidden behind a PDF or dynamic React site that Cheerio can't scrape, admins can manually inject verified entries directly into the DB without using Gemini.
+1. Added **Edit Scrape URL** admin action in UI.
+2. Added backend validation for organization URLs (`http(s)` only).
+3. Added scraper fallback from `scrapeUrl` to `officialWebsite` on `404`.
+4. Corrected Student Activities default scrape URL to `https://students.ieee.org/`.
+5. Hardened cron endpoint behavior:
+	 - explicit error when `CRON_SECRET` is missing
+	 - reduced batch size to 1 org per run to reduce timeout risk
+	 - Vercel function `maxDuration` set to 60s for backend function
 
-## Frontend UI Architecture
+## API Surface (Key Endpoints)
 
-- **Dashboard:** Features aggregate stats (calculated natively via fast Prisma `SELECT COUNT` queries), dynamic React components, and a custom-built pure HTML5/JS `HeroGlobe` 3D animation mapping virtual connections.
-- **Opportunities Feed:** The main explorer for users. It is deeply connected to filtering state and utilizes **Infinite Scroll Pagination**. Because there can be thousands of rows, the API limits results to 50 at a time, deterministically sorted by `deadline` and `id`, using React state to append new pages cleanly.
-- **"Save For Later":** Uses physical browser `localStorage` isolated to the user's browser domain, allowing students to bookmark competitions without needing a formal user-account login system database.
+### Public
+- `GET /api/stats`
+- `GET /api/organizations`
+- `GET /api/opportunities`
+- `GET /api/opportunities/:id`
 
-## Deployment Strategy (Vercel)
+### Admin (JWT required)
+- `POST /api/admin/login`
+- `POST /api/admin/scrape/:id`
+- `POST /api/admin/opportunities`
+- `PUT /api/admin/opportunities/:id`
+- `DELETE /api/admin/opportunities/:id`
+- `PUT /api/admin/organizations/:id`
 
-The application handles monorepo complexity using a custom `vercel.json` rewrite engine.
-Instead of spinning up a heavyweight full monolithic Node/Express server daemon (which is expensive and slow), Vercel natively carves the `api/index.js` Express file into highly-scalable, independent serverless/lambda functions triggered *only* when that specific route is pinged.
+### System
+- `GET /api/cron/scrape-batch` (requires `Authorization: Bearer <CRON_SECRET>`)
+- `GET /api/admin/force-seed` (manual patch utility route when deployed)
 
-Client-side React routes are strictly caught by `"fallback": "frontend/dist/index.html"` to allow native browser SPA navigation to function.
+## Deployment Notes (Vercel)
+
+### Required environment variables
+- `NEON_DATABASE_URL`
+- `GEMINI_API_KEY`
+- `JWT_SECRET`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD_HASH`
+- `CRON_SECRET`
+- `VITE_API_URL` (`/api` for same-domain deployment)
+
+### Monorepo settings
+- Repository: `psreyas09/ieee`
+- Production branch: `main`
+- Root directory: `opportunity-tracker`
+- Ensure automatic production deployments are enabled
+- Ensure ignored build step is empty unless intentionally used
+- Keep `frontend/dist` untracked in git to avoid stale static assets overriding fresh builds
+
+## Operations Runbook
+
+### Validate cron endpoint
+```bash
+curl -H "Authorization: Bearer <REAL_CRON_SECRET>" \
+	https://<domain>/api/cron/scrape-batch
+```
+
+Expected: JSON with `message` and `results`.
+
+### Common failure signatures
+- `401 Unauthorized CRON request`: bad/missing auth secret.
+- `500 CRON_SECRET is missing`: add env var and redeploy.
+- `Cannot GET /api/cron/scrape-batch`: old deployment or wrong project settings.
+
+### Student Activities URL correction (one-time DB patch)
+```sql
+UPDATE "Organization"
+SET "scrapeUrl" = 'https://students.ieee.org/'
+WHERE "name" = 'IEEE Student Activities';
+```

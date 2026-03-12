@@ -7,6 +7,16 @@ A full-stack web application designed for IEEE student members to discover compe
 - Database: PostgreSQL (Neon) via Prisma
 - AI Scraping: Cheerio API & Google Gemini 2.5 Flash
 
+## Recent Feature Updates
+- Admin dashboard now includes an in-place **Edit Scrape URL** action for each organization.
+- Backend validates `scrapeUrl` and `officialWebsite` on admin updates (must be valid `http(s)` URLs).
+- Scraper now falls back from `scrapeUrl` to `officialWebsite` when the primary URL returns `404`.
+- Student Activities defaults were corrected to `https://students.ieee.org/`.
+- Cron scraping was hardened for Vercel serverless behavior:
+   - clearer error if `CRON_SECRET` is missing
+   - reduced cron batch size to 1 org per run to reduce timeout risk
+   - configured Vercel function `maxDuration` to 60 seconds
+
 ## Project Structure
 This repository uses a monorepo structure configured for automated Vercel deployments.
 - `/frontend` - Contains the React app
@@ -54,6 +64,7 @@ When deploying to Vercel, **you do not use `.env` files.** Instead, you must add
    - \`JWT_SECRET\` (Use a strong, secure random string for production)
    - \`ADMIN_USERNAME\`
    - \`ADMIN_PASSWORD_HASH\`
+   - \`CRON_SECRET\` (Required for authenticated Vercel cron calls)
 3. **Important for Frontend:** Add the following key to let the React app know where the API is hosted in production:
    - \`VITE_API_URL\` = \`/api\`  *(Since Vercel serves the API on the same domain as the frontend, a relative path is required).*
 
@@ -83,3 +94,41 @@ When deploying to Vercel, **you do not use `.env` files.** Instead, you must add
 3. Configure the Root Directory to the base of the monorepo (where `vercel.json` exists).
 4. Add all required Environment Variables into Vercel Project Settings.
 5. Deploy! Vercel will automatically use `vercel.json` to build the static React frontend and configure the `api/` serverless functions.
+
+## Cron Scraping Operations
+
+### Manual cron health test
+Use your real production secret, not the placeholder text:
+
+```bash
+curl -H "Authorization: Bearer <REAL_CRON_SECRET>" \
+   https://<your-domain>/api/cron/scrape-batch
+```
+
+Expected response: JSON object containing `message` and `results`.
+
+### Common errors
+- `401 Unauthorized CRON request`: secret mismatch or missing auth header.
+- `500 CRON_SECRET is missing`: add `CRON_SECRET` in Vercel env vars and redeploy.
+- `Cannot GET /api/cron/scrape-batch`: old deployment is serving; deploy latest commit and verify project root/repo settings.
+
+## Production Troubleshooting
+
+### If latest frontend/backend changes are not visible
+1. Verify Vercel project points to `psreyas09/ieee` and production branch `main`.
+2. Verify root directory is correct for this monorepo (`opportunity-tracker`).
+3. Ensure `Automatic Production Deployments` is enabled.
+4. Ensure no `Ignored Build Step` is blocking deploys.
+5. Deploy latest commit explicitly (or use `vercel --prod` from `opportunity-tracker/`).
+6. Ensure `frontend/dist` build artifacts are not tracked in git (source should be built by Vercel).
+
+### If Student Activities scrape fails with 404
+Run this SQL once in production Neon DB:
+
+```sql
+UPDATE "Organization"
+SET "scrapeUrl" = 'https://students.ieee.org/'
+WHERE "name" = 'IEEE Student Activities';
+```
+
+Then retry scraping from Admin.
