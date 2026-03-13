@@ -385,10 +385,10 @@ app.get('/api/cron/scrape-batch', async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized CRON request' });
         }
 
-        // Fetch only 1 org per run to stay within serverless execution limits.
+        // Fetch 5 orgs per run (oldest-scraped-first). maxDuration is 60s via vercel.json builds config.
         const organizations = await prisma.organization.findMany({
-            orderBy: { lastScrapedAt: 'asc' }, // nulls are treated as first/oldest in Postgres asc
-            take: 1
+            orderBy: { lastScrapedAt: 'asc' }, // nulls/oldest first
+            take: 5
         });
 
         if (organizations.length === 0) {
