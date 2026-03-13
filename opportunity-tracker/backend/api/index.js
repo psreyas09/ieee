@@ -201,6 +201,13 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
         const result = await scrapeOrganization(organization);
 
         if (!result.success) {
+            if (result.errorType === 'quota') {
+                return res.status(429).json({
+                    error: result.error,
+                    raw: result.raw,
+                    retryAfterSec: result.retryAfterSec || null
+                });
+            }
             return res.status(500).json({ error: 'Failed to process AI output', raw: result.raw });
         }
 

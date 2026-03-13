@@ -8,6 +8,13 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+function extractRetryAfterSeconds(message = '') {
+    const match = String(message).match(/retryDelay\"\s*:\s*\"(\d+)s\"/i) || String(message).match(/retry in\s+(\d+(?:\.\d+)?)s/i);
+    if (!match) return null;
+    const value = Number(match[1]);
+    return Number.isFinite(value) ? Math.ceil(value) : null;
+}
+
 async function fetchAndExtractText(url) {
     try {
         const { data } = await axios.get(url, {
@@ -104,17 +111,33 @@ async function analyzeWithGemini(text) {
         const isQuotaError = liteError.status === 429 || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED');
 
         if (isQuotaError) {
-            console.warn(`flash-lite quota/rate-limit hit. Aborting to protect flash quota.`);
-            return { success: false, data: null, raw: liteError.message, error: `Google AI Quota Exceeded (Please wait a minute): ${liteError.message}` };
+            console.warn('flash-lite quota/rate-limit hit. Trying gemini-2.5-flash fallback...');
+        } else {
+            console.warn(`flash-lite parsing failed: ${errMsg}. Falling back to gemini-2.5-flash...`);
         }
 
-        console.warn(`flash-lite parsing failed: ${errMsg}. Falling back to gemini-2.5-flash...`);
         try {
             const opportunities = await tryModel('gemini-2.5-flash');
             return { success: true, data: opportunities, raw: null };
         } catch (flashError) {
-            console.error("Both models failed to parse JSON output.", flashError.message);
-            return { success: false, data: null, raw: flashError.message, error: `JSON Parse Fallback Failed: ${flashError.message}` };
+            const flashMsg = flashError.message || '';
+            const flashQuota = flashError.status === 429 || flashMsg.includes('429') || flashMsg.includes('RESOURCE_EXHAUSTED');
+            const retryAfter = extractRetryAfterSeconds(flashMsg) ?? extractRetryAfterSeconds(errMsg);
+
+            if (isQuotaError && flashQuota) {
+                console.error('Gemini quota/rate-limit exhausted for both models.', flashMsg);
+                return {
+                    success: false,
+                    data: null,
+                    raw: flashMsg,
+                    error: 'Google AI quota/rate-limit exceeded for both models.',
+                    errorType: 'quota',
+                    retryAfterSec: retryAfter
+                };
+            }
+
+            console.error('Both models failed to parse JSON output.', flashMsg);
+            return { success: false, data: null, raw: flashMsg, error: `JSON Parse Fallback Failed: ${flashMsg}` };
         }
     }
 }
