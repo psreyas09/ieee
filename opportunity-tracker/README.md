@@ -9,13 +9,17 @@ A full-stack web application designed for IEEE student members to discover compe
 
 ## Recent Feature Updates
 - Admin dashboard now includes an in-place **Edit Scrape URL** action for each organization.
+- Admin dashboard now auto-refreshes organizations/opportunities every 30 seconds.
 - Backend validates `scrapeUrl` and `officialWebsite` on admin updates (must be valid `http(s)` URLs).
 - Scraper now falls back from `scrapeUrl` to `officialWebsite` when the primary URL returns `404`.
 - Student Activities defaults were corrected to `https://students.ieee.org/`.
 - Cron scraping was hardened for Vercel serverless behavior:
    - clearer error if `CRON_SECRET` is missing
-   - reduced cron batch size to 1 org per run to reduce timeout risk
-   - configured Vercel function `maxDuration` to 60 seconds
+   - batch size set to 5 orgs per run
+   - configured Vercel backend function `maxDuration` to 60 seconds
+- Gemini quota handling improved:
+   - returns `429` (instead of generic `500`) when AI quota is exhausted
+   - supports multi-key failover across `GEMINI_API_KEY` and `GEMINI_API_KEY_2`
 
 ## Project Structure
 This repository uses a monorepo structure configured for automated Vercel deployments.
@@ -61,6 +65,8 @@ When deploying to Vercel, **you do not use `.env` files.** Instead, you must add
 2. Add the following keys and their corresponding values (same as your local setup):
    - \`NEON_DATABASE_URL\`
    - \`GEMINI_API_KEY\`
+   - `GEMINI_API_KEY_2` (optional, recommended for quota failover)
+   - `GEMINI_API_KEYS` (optional CSV list for more than two keys)
    - \`JWT_SECRET\` (Use a strong, secure random string for production)
    - \`ADMIN_USERNAME\`
    - \`ADMIN_PASSWORD_HASH\`
@@ -111,6 +117,7 @@ Expected response: JSON object containing `message` and `results`.
 - `401 Unauthorized CRON request`: secret mismatch or missing auth header.
 - `500 CRON_SECRET is missing`: add `CRON_SECRET` in Vercel env vars and redeploy.
 - `Cannot GET /api/cron/scrape-batch`: old deployment is serving; deploy latest commit and verify project root/repo settings.
+- `429 Google AI quota/rate-limit exceeded`: Gemini key(s) exhausted; wait for reset or configure secondary key(s).
 
 ## Production Troubleshooting
 

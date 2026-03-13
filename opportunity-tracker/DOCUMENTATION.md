@@ -39,6 +39,8 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - Primary: `gemini-2.5-flash-lite`
 - Fallback: `gemini-2.5-flash`
 - Retry logic for temporary errors (`429`, `503`, transient fetch errors)
+- Multi-key failover across `GEMINI_API_KEY`, `GEMINI_API_KEY_2`, or `GEMINI_API_KEYS` CSV
+- Returns explicit quota metadata when both models/keys are exhausted (`429`, `retryAfterSec`)
 
 ### Deduplication
 - Title similarity uses normalized token overlap with stop-word filtering.
@@ -49,6 +51,7 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - Secure login via JWT (`/api/admin/login`)
 - Trigger scrape per organization (`/api/admin/scrape/:id`)
 - Sequential "Scrape All" from UI
+- Auto-refresh of dashboard data every 30 seconds
 - CRUD for manual opportunities
 - Update organization data (`/api/admin/organizations/:id`)
 - Edit scrape URL directly in dashboard UI (pencil action)
@@ -61,8 +64,12 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 4. Corrected Student Activities default scrape URL to `https://students.ieee.org/`.
 5. Hardened cron endpoint behavior:
 	 - explicit error when `CRON_SECRET` is missing
-	 - reduced batch size to 1 org per run to reduce timeout risk
+	 - batch size increased to 5 orgs per run
 	 - Vercel function `maxDuration` set to 60s for backend function
+6. Improved Gemini quota behavior:
+	 - returns `429` for quota exhaustion in admin scrape endpoint
+	 - includes `retryAfterSec` when available from provider response
+	 - rotates/fails over to secondary configured key(s)
 
 ## API Surface (Key Endpoints)
 
@@ -89,6 +96,8 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 ### Required environment variables
 - `NEON_DATABASE_URL`
 - `GEMINI_API_KEY`
+- `GEMINI_API_KEY_2` (optional)
+- `GEMINI_API_KEYS` (optional CSV for multi-key rotation)
 - `JWT_SECRET`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD_HASH`
