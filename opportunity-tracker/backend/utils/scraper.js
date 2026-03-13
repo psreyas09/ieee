@@ -4,9 +4,38 @@ const cheerio = require('cheerio');
 const { GoogleGenAI } = require('@google/genai');
 const https = require('https');
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+function getGeminiApiKeys() {
+    const csvKeys = (process.env.GEMINI_API_KEYS || '')
+        .split(',')
+        .map(key => key.trim())
+        .filter(Boolean);
+
+    const namedKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_2]
+        .map(key => (key || '').trim())
+        .filter(Boolean);
+
+    return [...new Set([...csvKeys, ...namedKeys])];
+}
+
+const geminiApiKeys = getGeminiApiKeys();
+const geminiClients = geminiApiKeys.map(apiKey => new GoogleGenAI({ apiKey }));
+let nextGeminiClientIndex = 0;
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+function getGeminiClientOrder() {
+    if (geminiClients.length <= 1) {
+        return geminiClients.map((client, index) => ({ client, keyNumber: index + 1 }));
+    }
+
+    const startIndex = nextGeminiClientIndex % geminiClients.length;
+    nextGeminiClientIndex = (nextGeminiClientIndex + 1) % geminiClients.length;
+
+    return geminiClients.map((_, offset) => {
+        const clientIndex = (startIndex + offset) % geminiClients.length;
+        return { client: geminiClients[clientIndex], keyNumber: clientIndex + 1 };
+    });
+}
 
 function extractRetryAfterSeconds(message = '') {
     const match = String(message).match(/retryDelay\"\s*:\s*\"(\d+)s\"/i) || String(message).match(/retry in\s+(\d+(?:\.\d+)?)s/i);
@@ -64,41 +93,55 @@ async function fetchAndExtractText(url) {
 async function analyzeWithGemini(text) {
     const prompt = `From the following webpage text, extract all student competitions, paper contests, grants, hackathons, fellowships, workshops or any opportunities relevant to IEEE student members. Return ONLY a valid JSON array with no extra text, no preamble, no markdown. Each object must have: title (string), description (string 2-3 sentences), deadline (ISO 8601 date string or null), eligibility (string), url (string or null), type (one of: Competition, Paper Contest, Grant, Hackathon, Fellowship, Workshop, Webinar, Other), status (one of: Live, Upcoming, Closed). Webpage text: ${text}`;
 
-    // Helper to call a specific model and parse with intelligent 503/429 retries
+    // Try the current key first, then fail over to the next key on quota exhaustion.
     const tryModel = async (modelName, retries = 3) => {
         let lastError;
-        for (let attempt = 1; attempt <= retries; attempt++) {
-            try {
-                const response = await ai.models.generateContent({
-                    model: modelName,
-                    contents: prompt
-                });
+        const clientsToTry = getGeminiClientOrder();
 
-                const output = response.text;
-                const cleanJsonStr = output.replace(/```json/gi, '').replace(/```/g, '').trim();
-                const opportunities = JSON.parse(cleanJsonStr);
+        for (let clientIndex = 0; clientIndex < clientsToTry.length; clientIndex++) {
+            const { client, keyNumber } = clientsToTry[clientIndex];
 
-                if (!Array.isArray(opportunities)) {
-                    throw new Error("Output is not a JSON array.");
-                }
-                return opportunities;
-            } catch (error) {
-                lastError = error;
-                const errMsg = error.message || '';
-                const isRetryable = error.status === 503 || error.status === 429 ||
-                    errMsg.includes('503') || errMsg.includes('429') ||
-                    errMsg.includes('UNAVAILABLE') || errMsg.includes('RESOURCE_EXHAUSTED') ||
-                    errMsg.includes('fetch failed');
+            for (let attempt = 1; attempt <= retries; attempt++) {
+                try {
+                    const response = await client.models.generateContent({
+                        model: modelName,
+                        contents: prompt
+                    });
 
-                if (isRetryable && attempt < retries) {
-                    const delayMs = attempt * 2500; // Incrementing backoff (2.5s, 5.0s)
-                    console.warn(`[Attempt ${attempt}/${retries}] Model ${modelName} returned Temporary Error (503/429), retrying in ${delayMs}ms...`);
-                    await wait(delayMs);
-                } else {
-                    throw error; // Not retryable or max retries reached, pass to outer fallback
+                    const output = response.text;
+                    const cleanJsonStr = output.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    const opportunities = JSON.parse(cleanJsonStr);
+
+                    if (!Array.isArray(opportunities)) {
+                        throw new Error('Output is not a JSON array.');
+                    }
+                    return opportunities;
+                } catch (error) {
+                    lastError = error;
+                    const errMsg = error.message || '';
+                    const isQuotaError = error.status === 429 || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED');
+                    const isRetryable = error.status === 503 || error.status === 429 ||
+                        errMsg.includes('503') || errMsg.includes('429') ||
+                        errMsg.includes('UNAVAILABLE') || errMsg.includes('RESOURCE_EXHAUSTED') ||
+                        errMsg.includes('fetch failed');
+
+                    if (isRetryable && attempt < retries) {
+                        const delayMs = attempt * 2500;
+                        console.warn(`[Attempt ${attempt}/${retries}] Model ${modelName} on Gemini key ${keyNumber} returned a temporary error, retrying in ${delayMs}ms...`);
+                        await wait(delayMs);
+                        continue;
+                    }
+
+                    if (isQuotaError && clientIndex < clientsToTry.length - 1) {
+                        console.warn(`Gemini key ${keyNumber} quota exhausted for model ${modelName}. Switching to the next configured key...`);
+                        break;
+                    }
+
+                    throw error;
                 }
             }
         }
+
         throw lastError;
     };
 
@@ -143,7 +186,7 @@ async function analyzeWithGemini(text) {
 }
 
 async function scrapeOrganization(organization) {
-    if (!process.env.GEMINI_API_KEY) {
+    if (geminiClients.length === 0) {
         throw new Error('GEMINI_API_KEY is missing');
     }
 
