@@ -27,6 +27,8 @@ export default function AdminDashboard() {
             return;
         }
         fetchData();
+        const interval = setInterval(fetchData, 30000);
+        return () => clearInterval(interval);
     }, [navigate, page]);
 
     const fetchData = async () => {
