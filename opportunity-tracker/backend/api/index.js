@@ -98,6 +98,223 @@ const deriveOpportunityTiming = (opp, existing = null) => {
     return { parsedDate: finalDate, finalStatus };
 };
 
+const calculateSimilarity = (str1, str2) => {
+    const stopWords = new Set(['ieee', 'the', 'and', 'for', 'program', 'council', 'society', 'chapter', 'section', 'award', 'awards']);
+
+    const processStr = (str) => {
+        return String(str || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, '')
+            .split(/\s+/)
+            .filter(w => w.length > 2 && !stopWords.has(w))
+            .map(w => w.endsWith('s') ? w.slice(0, -1) : w);
+    };
+
+    const s1 = processStr(str1);
+    const s2 = processStr(str2);
+    if (s1.length === 0 || s2.length === 0) return 0;
+
+    const set1 = new Set(s1);
+    const set2 = new Set(s2);
+    let intersection = 0;
+    for (const word of set1) {
+        if (set2.has(word)) intersection++;
+    }
+
+    return intersection / Math.min(set1.size, set2.size);
+};
+
+const SCRAPE_MATCH_THRESHOLD = 0.5;
+const DUPLICATE_GROUP_THRESHOLD = 0.62;
+const DUPLICATE_DATE_WINDOW_DAYS = 60;
+
+const isNonEmpty = (value) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string') return value.trim().length > 0;
+    return true;
+};
+
+const findPrimaryCandidate = (records) => {
+    const statusRank = { Live: 3, Upcoming: 2, Closed: 1 };
+    const fieldCompleteness = (row) => {
+        return [row.description, row.eligibility, row.url, row.deadline, row.type, row.status]
+            .filter(isNonEmpty).length;
+    };
+
+    return [...records].sort((a, b) => {
+        if (Boolean(a.verified) !== Boolean(b.verified)) return Number(Boolean(b.verified)) - Number(Boolean(a.verified));
+        if ((a.source === 'manual') !== (b.source === 'manual')) return Number(b.source === 'manual') - Number(a.source === 'manual');
+
+        const statusDiff = (statusRank[b.status] || 0) - (statusRank[a.status] || 0);
+        if (statusDiff !== 0) return statusDiff;
+
+        const completenessDiff = fieldCompleteness(b) - fieldCompleteness(a);
+        if (completenessDiff !== 0) return completenessDiff;
+
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    })[0];
+};
+
+const areDatesClose = (left, right) => {
+    if (!left || !right) return true;
+    const ms = Math.abs(new Date(left).getTime() - new Date(right).getTime());
+    return ms <= DUPLICATE_DATE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+};
+
+const getBestFieldValue = (records, field) => {
+    for (const row of records) {
+        if (isNonEmpty(row[field])) return row[field];
+    }
+    return null;
+};
+
+const processScrapedOpportunities = async (organization, opportunities) => {
+    let addedCount = 0;
+
+    const allExistingForOrg = await prisma.opportunity.findMany({
+        where: { organizationId: organization.id, status: { not: 'Closed' } }
+    });
+
+    for (const opp of opportunities) {
+        let existing = null;
+        for (const record of allExistingForOrg) {
+            if (calculateSimilarity(opp.title, record.title) > SCRAPE_MATCH_THRESHOLD) {
+                existing = record;
+                break;
+            }
+        }
+
+        if (!existing) {
+            const { parsedDate, finalStatus } = deriveOpportunityTiming(opp);
+            const created = await prisma.opportunity.create({
+                data: {
+                    title: opp.title,
+                    description: opp.description || '',
+                    deadline: parsedDate,
+                    eligibility: opp.eligibility,
+                    url: opp.url || organization.officialWebsite,
+                    type: opp.type || 'Other',
+                    status: finalStatus,
+                    source: 'auto',
+                    organizationId: organization.id,
+                    lastFetchedAt: new Date()
+                }
+            });
+            allExistingForOrg.push(created);
+            addedCount++;
+            continue;
+        }
+
+        const { parsedDate, finalStatus } = deriveOpportunityTiming(opp, existing);
+        await prisma.opportunity.update({
+            where: { id: existing.id },
+            data: {
+                lastFetchedAt: new Date(),
+                deadline: parsedDate || existing.deadline,
+                status: finalStatus,
+                url: opp.url || existing.url
+            }
+        });
+    }
+
+    return { opportunitiesFound: opportunities.length, opportunitiesAdded: addedCount };
+};
+
+const executeScrapeForOrganization = async (organization, source) => {
+    const startedAt = new Date();
+    let status = 'failed';
+    let errorMessage = null;
+    let opportunitiesFound = 0;
+    let opportunitiesAdded = 0;
+    let failurePayload = null;
+    let failureHttpStatus = 500;
+
+    try {
+        const result = await scrapeOrganization(organization);
+
+        if (!result.success) {
+            errorMessage = result.error || 'Failed to process AI output';
+            if (result.errorType === 'quota') {
+                failureHttpStatus = 429;
+                failurePayload = {
+                    error: result.error,
+                    raw: result.raw,
+                    retryAfterSec: result.retryAfterSec || null
+                };
+            } else {
+                failurePayload = { error: 'Failed to process AI output', raw: result.raw };
+            }
+            return {
+                success: false,
+                httpStatus: failureHttpStatus,
+                payload: failurePayload,
+                opportunitiesFound,
+                opportunitiesAdded,
+                errorMessage
+            };
+        }
+
+        const processed = await processScrapedOpportunities(organization, result.data || []);
+        opportunitiesFound = processed.opportunitiesFound;
+        opportunitiesAdded = processed.opportunitiesAdded;
+        status = 'success';
+        return {
+            success: true,
+            payload: {
+                message: 'Scrape successful',
+                opportunitiesFound,
+                newAdded: opportunitiesAdded
+            },
+            opportunitiesFound,
+            opportunitiesAdded,
+            errorMessage: null
+        };
+    } catch (error) {
+        errorMessage = error.message || 'Unexpected scrape error';
+        failurePayload = { error: errorMessage };
+        return {
+            success: false,
+            httpStatus: 500,
+            payload: failurePayload,
+            opportunitiesFound,
+            opportunitiesAdded,
+            errorMessage
+        };
+    } finally {
+        try {
+            await prisma.organization.update({
+                where: { id: organization.id },
+                data: { lastScrapedAt: new Date() }
+            });
+        } catch (error) {
+            console.error(`Failed to update lastScrapedAt for ${organization.name}:`, error);
+        }
+
+        try {
+            await prisma.scrapeRunLog.create({
+                data: {
+                    organizationId: organization.id,
+                    startedAt,
+                    endedAt: new Date(),
+                    status,
+                    errorMessage,
+                    opportunitiesFound,
+                    opportunitiesAdded,
+                    source
+                }
+            });
+        } catch (error) {
+            console.error(`Failed to persist scrape run log for ${organization.name}:`, error);
+        }
+    }
+};
+
+const computeSuccessRate = (successCount, failedCount) => {
+    const total = successCount + failedCount;
+    if (total === 0) return 0;
+    return Number(((successCount / total) * 100).toFixed(1));
+};
+
 // --- Middleware ---
 const authenticateAdmin = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -301,105 +518,339 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
             }
         }
 
-        const result = await scrapeOrganization(organization);
+        const scrape = await executeScrapeForOrganization(organization, 'manual');
 
-        if (!result.success) {
-            if (result.errorType === 'quota') {
-                return res.status(429).json({
-                    error: result.error,
-                    raw: result.raw,
-                    retryAfterSec: result.retryAfterSec || null
-                });
-            }
-            return res.status(500).json({ error: 'Failed to process AI output', raw: result.raw });
+        if (!scrape.success) {
+            return res.status(scrape.httpStatus || 500).json(scrape.payload);
         }
 
-        function calculateSimilarity(str1, str2) {
-            const stopWords = new Set(['ieee', 'the', 'and', 'for', 'program', 'council', 'society', 'chapter', 'section', 'award', 'awards']);
-
-            const processStr = (str) => {
-                return str.toLowerCase()
-                    .replace(/[^a-z0-9\s]/g, '')
-                    .split(/\s+/)
-                    .filter(w => w.length > 2 && !stopWords.has(w))
-                    .map(w => w.endsWith('s') ? w.slice(0, -1) : w);
-            };
-
-            const s1 = processStr(str1);
-            const s2 = processStr(str2);
-            if (s1.length === 0 || s2.length === 0) return 0;
-
-            const set1 = new Set(s1);
-            const set2 = new Set(s2);
-            let intersection = 0;
-            for (let word of set1) { if (set2.has(word)) intersection++; }
-
-            return intersection / Math.min(set1.size, set2.size);
-        }
-
-        // Upsert logic for extracted opportunities
-        const opportunities = result.data;
-        let addedCount = 0;
-
-        // Fetch all existing active opportunities for deterministic fuzzy comparison
-        const allExistingForOrg = await prisma.opportunity.findMany({
-            where: { organizationId: orgId, status: { not: 'Closed' } }
-        });
-
-        // Add logic to avoid recreating duplicates if exact or highly similar title already exists
-        for (const opp of opportunities) {
-            // Find semantic match instead of exact
-            let existing = null;
-            for (const record of allExistingForOrg) {
-                if (calculateSimilarity(opp.title, record.title) > 0.5) {
-                    existing = record;
-                    break;
-                }
-            }
-
-            if (!existing) {
-                const { parsedDate, finalStatus } = deriveOpportunityTiming(opp);
-
-                await prisma.opportunity.create({
-                    data: {
-                        title: opp.title,
-                        description: opp.description || '',
-                        deadline: parsedDate,
-                        eligibility: opp.eligibility,
-                        url: opp.url || organization.officialWebsite,
-                        type: opp.type || 'Other',
-                        status: finalStatus,
-                        source: 'auto',
-                        organizationId: orgId,
-                        lastFetchedAt: new Date()
-                    }
-                });
-                addedCount++;
-            } else {
-                const { parsedDate, finalStatus } = deriveOpportunityTiming(opp, existing);
-
-                await prisma.opportunity.update({
-                    where: { id: existing.id },
-                    data: {
-                        lastFetchedAt: new Date(),
-                        deadline: parsedDate || existing.deadline,
-                        status: finalStatus,
-                        url: opp.url || existing.url
-                    }
-                });
-            }
-        }
-
-        await prisma.organization.update({
-            where: { id: orgId },
-            data: { lastScrapedAt: new Date() }
-        });
-
-        res.json({ message: 'Scrape successful', opportunitiesFound: opportunities.length, newAdded: addedCount });
+        res.json(scrape.payload);
 
     } catch (error) {
         console.error('Scraping error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/admin/scrape-health', authenticateAdmin, async (req, res) => {
+    try {
+        const organizations = await prisma.organization.findMany({
+            orderBy: { name: 'asc' },
+            select: {
+                id: true,
+                name: true,
+                lastScrapedAt: true
+            }
+        });
+
+        const orgIds = organizations.map(org => org.id);
+        const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
+
+        const [latestRuns, weeklyRuns] = await Promise.all([
+            prisma.scrapeRunLog.findMany({
+                where: { organizationId: { in: orgIds } },
+                orderBy: { startedAt: 'desc' }
+            }),
+            prisma.scrapeRunLog.findMany({
+                where: {
+                    organizationId: { in: orgIds },
+                    startedAt: { gte: sevenDaysAgo }
+                }
+            })
+        ]);
+
+        const latestRunByOrg = new Map();
+        for (const run of latestRuns) {
+            if (!latestRunByOrg.has(run.organizationId)) {
+                latestRunByOrg.set(run.organizationId, run);
+            }
+        }
+
+        const weeklyByOrg = new Map();
+        for (const run of weeklyRuns) {
+            const bucket = weeklyByOrg.get(run.organizationId) || {
+                success7d: 0,
+                failed7d: 0,
+                opportunitiesAdded7d: 0
+            };
+
+            if (run.status === 'success') bucket.success7d += 1;
+            if (run.status === 'failed') bucket.failed7d += 1;
+            bucket.opportunitiesAdded7d += run.opportunitiesAdded || 0;
+            weeklyByOrg.set(run.organizationId, bucket);
+        }
+
+        const data = organizations.map((org) => {
+            const latestRun = latestRunByOrg.get(org.id) || null;
+            const weekly = weeklyByOrg.get(org.id) || {
+                success7d: 0,
+                failed7d: 0,
+                opportunitiesAdded7d: 0
+            };
+
+            return {
+                organizationId: org.id,
+                organizationName: org.name,
+                lastScrapedAt: org.lastScrapedAt || latestRun?.startedAt || null,
+                lastStatus: latestRun?.status || 'unknown',
+                lastError: latestRun?.errorMessage || null,
+                success7d: weekly.success7d,
+                failed7d: weekly.failed7d,
+                opportunitiesAdded7d: weekly.opportunitiesAdded7d,
+                successRate: computeSuccessRate(weekly.success7d, weekly.failed7d)
+            };
+        });
+
+        res.json({ data });
+    } catch (error) {
+        console.error('Error fetching scrape health:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/api/admin/scrape-health/:orgId', authenticateAdmin, async (req, res) => {
+    try {
+        const organization = await prisma.organization.findUnique({
+            where: { id: req.params.orgId },
+            select: { id: true, name: true, lastScrapedAt: true }
+        });
+
+        if (!organization) {
+            return res.status(404).json({ error: 'Organization not found' });
+        }
+
+        const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
+        const [latestRun, weeklyRuns] = await Promise.all([
+            prisma.scrapeRunLog.findFirst({
+                where: { organizationId: organization.id },
+                orderBy: { startedAt: 'desc' }
+            }),
+            prisma.scrapeRunLog.findMany({
+                where: {
+                    organizationId: organization.id,
+                    startedAt: { gte: sevenDaysAgo }
+                }
+            })
+        ]);
+
+        const success7d = weeklyRuns.filter(run => run.status === 'success').length;
+        const failed7d = weeklyRuns.filter(run => run.status === 'failed').length;
+        const opportunitiesAdded7d = weeklyRuns.reduce((sum, run) => sum + (run.opportunitiesAdded || 0), 0);
+
+        res.json({
+            data: {
+                organizationId: organization.id,
+                organizationName: organization.name,
+                lastScrapedAt: organization.lastScrapedAt || latestRun?.startedAt || null,
+                lastStatus: latestRun?.status || 'unknown',
+                lastError: latestRun?.errorMessage || null,
+                success7d,
+                failed7d,
+                opportunitiesAdded7d,
+                successRate: computeSuccessRate(success7d, failed7d)
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching scrape health detail:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/api/admin/duplicates', authenticateAdmin, async (req, res) => {
+    try {
+        const opportunities = await prisma.opportunity.findMany({
+            include: {
+                organization: {
+                    select: { id: true, name: true }
+                }
+            },
+            orderBy: [
+                { organizationId: 'asc' },
+                { updatedAt: 'desc' }
+            ]
+        });
+
+        const opportunitiesByOrg = new Map();
+        for (const opp of opportunities) {
+            const bucket = opportunitiesByOrg.get(opp.organizationId) || [];
+            bucket.push(opp);
+            opportunitiesByOrg.set(opp.organizationId, bucket);
+        }
+
+        const groups = [];
+
+        for (const [organizationId, orgOpps] of opportunitiesByOrg.entries()) {
+            const graph = new Map();
+            const pairScores = new Map();
+            for (const opp of orgOpps) {
+                graph.set(opp.id, new Set());
+            }
+
+            for (let i = 0; i < orgOpps.length; i++) {
+                for (let j = i + 1; j < orgOpps.length; j++) {
+                    const left = orgOpps[i];
+                    const right = orgOpps[j];
+                    if (!areDatesClose(left.deadline, right.deadline)) continue;
+
+                    const score = calculateSimilarity(left.title, right.title);
+                    if (score < DUPLICATE_GROUP_THRESHOLD) continue;
+
+                    graph.get(left.id).add(right.id);
+                    graph.get(right.id).add(left.id);
+                    pairScores.set(`${left.id}|${right.id}`, Number(score.toFixed(3)));
+                }
+            }
+
+            const visited = new Set();
+            for (const opp of orgOpps) {
+                if (visited.has(opp.id)) continue;
+                const queue = [opp.id];
+                const componentIds = [];
+                visited.add(opp.id);
+
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    componentIds.push(current);
+                    for (const next of graph.get(current)) {
+                        if (visited.has(next)) continue;
+                        visited.add(next);
+                        queue.push(next);
+                    }
+                }
+
+                if (componentIds.length < 2) continue;
+
+                const candidates = componentIds
+                    .map(id => orgOpps.find(row => row.id === id))
+                    .filter(Boolean)
+                    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+                const recommendedPrimary = findPrimaryCandidate(candidates);
+                const similarity = [];
+                for (let i = 0; i < candidates.length; i++) {
+                    for (let j = i + 1; j < candidates.length; j++) {
+                        const first = candidates[i];
+                        const second = candidates[j];
+                        const key = `${first.id}|${second.id}`;
+                        const reverseKey = `${second.id}|${first.id}`;
+                        const score = pairScores.get(key) ?? pairScores.get(reverseKey);
+                        if (score === undefined) continue;
+                        similarity.push({ leftId: first.id, rightId: second.id, score });
+                    }
+                }
+
+                groups.push({
+                    groupId: `${organizationId}:${recommendedPrimary.id}`,
+                    organizationId,
+                    organizationName: candidates[0]?.organization?.name || 'Unknown',
+                    recommendedPrimaryId: recommendedPrimary.id,
+                    similarity,
+                    candidates: candidates.map((item) => ({
+                        id: item.id,
+                        title: item.title,
+                        organizationId: item.organizationId,
+                        organizationName: item.organization?.name || 'Unknown',
+                        deadline: item.deadline,
+                        status: item.status,
+                        updatedAt: item.updatedAt,
+                        source: item.source,
+                        verified: item.verified,
+                        url: item.url
+                    }))
+                });
+            }
+        }
+
+        groups.sort((a, b) => a.organizationName.localeCompare(b.organizationName));
+
+        res.json({ data: groups });
+    } catch (error) {
+        console.error('Error finding duplicates:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.post('/api/admin/duplicates/merge', authenticateAdmin, async (req, res) => {
+    try {
+        const { primaryId, duplicateIds, allowCrossOrganization = false } = req.body || {};
+
+        const primary = typeof primaryId === 'string' ? primaryId.trim() : '';
+        const duplicates = Array.isArray(duplicateIds)
+            ? [...new Set(duplicateIds.map(id => String(id).trim()).filter(Boolean))]
+            : [];
+
+        if (!primary) {
+            return res.status(400).json({ error: 'primaryId is required' });
+        }
+
+        if (duplicates.length === 0) {
+            return res.status(400).json({ error: 'duplicateIds must include at least one id' });
+        }
+
+        if (duplicates.includes(primary)) {
+            return res.status(400).json({ error: 'primaryId cannot be merged into itself' });
+        }
+
+        const ids = [primary, ...duplicates];
+        const records = await prisma.opportunity.findMany({
+            where: { id: { in: ids } },
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        if (records.length !== ids.length) {
+            return res.status(404).json({ error: 'One or more opportunities were not found' });
+        }
+
+        const primaryRecord = records.find(row => row.id === primary);
+        if (!primaryRecord) {
+            return res.status(404).json({ error: 'Primary opportunity not found' });
+        }
+
+        if (!allowCrossOrganization) {
+            const orgId = primaryRecord.organizationId;
+            const crossOrg = records.find(row => row.organizationId !== orgId);
+            if (crossOrg) {
+                return res.status(400).json({ error: 'Cannot merge opportunities across different organizations' });
+            }
+        }
+
+        const mergedCandidates = [primaryRecord, ...records.filter(row => row.id !== primary)].sort((a, b) => {
+            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        });
+
+        const mergedData = {
+            title: getBestFieldValue([primaryRecord, ...mergedCandidates], 'title') || primaryRecord.title,
+            description: getBestFieldValue([primaryRecord, ...mergedCandidates], 'description') || '',
+            eligibility: getBestFieldValue([primaryRecord, ...mergedCandidates], 'eligibility'),
+            url: getBestFieldValue([primaryRecord, ...mergedCandidates], 'url'),
+            type: getBestFieldValue([primaryRecord, ...mergedCandidates], 'type') || primaryRecord.type,
+            status: getBestFieldValue([primaryRecord, ...mergedCandidates], 'status') || primaryRecord.status,
+            deadline: getBestFieldValue([primaryRecord, ...mergedCandidates], 'deadline') || primaryRecord.deadline,
+            lastFetchedAt: getBestFieldValue([primaryRecord, ...mergedCandidates], 'lastFetchedAt') || primaryRecord.lastFetchedAt,
+            verified: mergedCandidates.some(row => row.verified),
+            source: primaryRecord.source || getBestFieldValue(mergedCandidates, 'source') || 'auto'
+        };
+
+        await prisma.$transaction(async (tx) => {
+            await tx.opportunity.update({
+                where: { id: primary },
+                data: mergedData
+            });
+
+            await tx.opportunity.deleteMany({
+                where: { id: { in: duplicates } }
+            });
+        });
+
+        res.json({
+            success: true,
+            keptId: primary,
+            mergedCount: duplicates.length,
+            mergedIds: duplicates
+        });
+    } catch (error) {
+        console.error('Error merging duplicates:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
@@ -483,89 +934,17 @@ app.get('/api/cron/scrape-batch', async (req, res) => {
         const results = [];
         for (const org of organizations) {
             try {
-                // Shared logic block for processing one org
-                const result = await scrapeOrganization(org);
-
-                if (!result.success) {
-                    results.push({ org: org.name, status: 'failed', error: result.error });
-                    continue; // The finally block will still run and update the timestamp
+                const scrape = await executeScrapeForOrganization(org, 'cron');
+                if (!scrape.success) {
+                    results.push({ org: org.name, status: 'failed', error: scrape.errorMessage || scrape.payload?.error || 'Unknown error' });
+                    continue;
                 }
 
-                // Subset matching logic
-                function calculateSimilarity(str1, str2) {
-                    const stopWords = new Set(['ieee', 'the', 'and', 'for', 'program', 'council', 'society', 'chapter', 'section', 'award', 'awards']);
-                    const processStr = (str) => str.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w)).map(w => w.endsWith('s') ? w.slice(0, -1) : w);
-                    const s1 = processStr(str1);
-                    const s2 = processStr(str2);
-                    if (s1.length === 0 || s2.length === 0) return 0;
-                    const set1 = new Set(s1);
-                    const set2 = new Set(s2);
-                    let intersection = 0;
-                    for (let word of set1) { if (set2.has(word)) intersection++; }
-                    return intersection / Math.min(set1.size, set2.size);
-                }
-
-                const opportunities = result.data;
-                let addedCount = 0;
-
-                const allExistingForOrg = await prisma.opportunity.findMany({
-                    where: { organizationId: org.id, status: { not: 'Closed' } }
-                });
-
-                for (const opp of opportunities) {
-                    let existing = null;
-                    for (const record of allExistingForOrg) {
-                        if (calculateSimilarity(opp.title, record.title) > 0.5) {
-                            existing = record;
-                            break;
-                        }
-                    }
-
-                    const { parsedDate, finalStatus } = deriveOpportunityTiming(opp, existing);
-
-                    if (!existing) {
-                        await prisma.opportunity.create({
-                            data: {
-                                title: opp.title,
-                                description: opp.description || '',
-                                deadline: parsedDate,
-                                eligibility: opp.eligibility,
-                                url: opp.url || org.officialWebsite,
-                                type: opp.type || 'Other',
-                                status: finalStatus,
-                                source: 'auto',
-                                organizationId: org.id,
-                                lastFetchedAt: new Date()
-                            }
-                        });
-                        addedCount++;
-                    } else {
-                        await prisma.opportunity.update({
-                            where: { id: existing.id },
-                            data: {
-                                lastFetchedAt: new Date(),
-                                deadline: parsedDate || existing.deadline,
-                                status: finalStatus,
-                                url: opp.url || existing.url
-                            }
-                        });
-                    }
-                }
-
-                results.push({ org: org.name, status: 'success', added: addedCount });
+                results.push({ org: org.name, status: 'success', added: scrape.opportunitiesAdded });
 
             } catch (err) {
                 console.error(`Cron error scraping ${org.name}:`, err);
                 results.push({ org: org.name, status: 'failed', error: err.message });
-            } finally {
-                // EXTREMELY IMPORTANT: We MUST update lastScrapedAt even if the scrape failed 
-                // due to bot protection (403), 404, or Gemini errors. 
-                // Otherwise this org will be stuck at the front of the queue forever, 
-                // creating an infinite failure loop that starves other orgs.
-                await prisma.organization.update({
-                    where: { id: org.id },
-                    data: { lastScrapedAt: new Date() }
-                });
             }
         }
 
