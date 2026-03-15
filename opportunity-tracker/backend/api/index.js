@@ -49,6 +49,55 @@ const toOrganizationResponse = (org) => {
     };
 };
 
+const monthPattern = '(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)';
+
+const parseOpportunityDate = (value) => {
+    if (!value) return null;
+    const dt = new Date(value);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+};
+
+const inferDateFromText = (text) => {
+    const source = String(text || '');
+    if (!source) return null;
+
+    const rangeMatch = source.match(new RegExp(`${monthPattern}\\s+(\\d{1,2})\\s*[-–]\\s*(\\d{1,2}),\\s*(\\d{4})`, 'i'));
+    if (rangeMatch) {
+        const inferred = new Date(`${rangeMatch[1]} ${rangeMatch[3]}, ${rangeMatch[4]}`);
+        return Number.isNaN(inferred.getTime()) ? null : inferred;
+    }
+
+    const fullDateMatch = source.match(new RegExp(`${monthPattern}\\s+(\\d{1,2}),\\s*(\\d{4})`, 'i'));
+    if (fullDateMatch) {
+        const inferred = new Date(`${fullDateMatch[1]} ${fullDateMatch[2]}, ${fullDateMatch[3]}`);
+        return Number.isNaN(inferred.getTime()) ? null : inferred;
+    }
+
+    const yearMatch = source.match(/\b(20\d{2})\b/);
+    if (yearMatch) {
+        const inferredYear = Number(yearMatch[1]);
+        const currentYear = new Date().getFullYear();
+        if (inferredYear < currentYear) {
+            return new Date(`${inferredYear}-12-31T23:59:59.000Z`);
+        }
+    }
+
+    return null;
+};
+
+const deriveOpportunityTiming = (opp, existing = null) => {
+    const explicitDate = parseOpportunityDate(opp.deadline);
+    const inferredDate = explicitDate || inferDateFromText(`${opp.title || ''} ${opp.description || ''}`);
+    const finalDate = inferredDate || existing?.deadline || null;
+
+    let finalStatus = opp.status || existing?.status || 'Live';
+    if (finalDate && finalDate < new Date()) {
+        finalStatus = 'Closed';
+    }
+
+    return { parsedDate: finalDate, finalStatus };
+};
+
 // --- Middleware ---
 const authenticateAdmin = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -301,18 +350,7 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
             }
 
             if (!existing) {
-                let parsedDate = null;
-                if (opp.deadline) {
-                    const dt = new Date(opp.deadline);
-                    if (!isNaN(dt.getTime())) {
-                        parsedDate = dt;
-                    }
-                }
-
-                let finalStatus = opp.status || 'Live';
-                if (parsedDate && parsedDate < new Date()) {
-                    finalStatus = 'Closed';
-                }
+                const { parsedDate, finalStatus } = deriveOpportunityTiming(opp);
 
                 await prisma.opportunity.create({
                     data: {
@@ -330,21 +368,7 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
                 });
                 addedCount++;
             } else {
-                // Optionally update existing ones
-                let parsedDate = null;
-                if (opp.deadline) {
-                    const dt = new Date(opp.deadline);
-                    if (!isNaN(dt.getTime())) {
-                        parsedDate = dt;
-                    }
-                }
-
-                let finalStatus = opp.status || existing.status;
-                if (parsedDate && parsedDate < new Date()) {
-                    finalStatus = 'Closed';
-                } else if (!parsedDate && existing.deadline && existing.deadline < new Date()) {
-                    finalStatus = 'Closed';
-                }
+                const { parsedDate, finalStatus } = deriveOpportunityTiming(opp, existing);
 
                 await prisma.opportunity.update({
                     where: { id: existing.id },
@@ -489,12 +513,7 @@ app.get('/api/cron/scrape-batch', async (req, res) => {
                         }
                     }
 
-                    let parsedDate = opp.deadline ? new Date(opp.deadline) : null;
-                    if (parsedDate && isNaN(parsedDate.getTime())) parsedDate = null;
-
-                    let finalStatus = opp.status || (existing ? existing.status : 'Live');
-                    if (parsedDate && parsedDate < new Date()) finalStatus = 'Closed';
-                    else if (!parsedDate && existing && existing.deadline && existing.deadline < new Date()) finalStatus = 'Closed';
+                    const { parsedDate, finalStatus } = deriveOpportunityTiming(opp, existing);
 
                     if (!existing) {
                         await prisma.opportunity.create({
