@@ -42,15 +42,21 @@ export default function Directory() {
             </div>
 
             {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-40 bg-slate-100 rounded-xl animate-pulse"></div>)}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-h-[520px]">
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                        <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[220px] animate-pulse">
+                            <div className="h-12 bg-slate-100 rounded mb-4"></div>
+                            <div className="h-6 w-28 bg-slate-100 rounded mb-8"></div>
+                            <div className="mt-10 h-4 bg-slate-100 rounded"></div>
+                        </div>
+                    ))}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-h-[520px]">
                     {filteredOrgs.map(org => (
-                        <div key={org.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col hover:border-ieee-blue transition-colors">
+                        <div key={org.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col hover:border-ieee-blue transition-colors min-h-[220px]">
                             <div className="flex justify-between items-start mb-4">
-                                <h3 className="text-lg font-bold text-slate-900 leading-tight pr-4">{org.name}</h3>
+                                <h3 className="text-lg font-bold text-slate-900 leading-tight pr-4 min-h-[56px]">{org.name}</h3>
                                 <div className={`w-3 h-3 rounded-full shrink-0 mt-1 ${org._count.opportunities > 0 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-slate-300'}`} title={org._count.opportunities > 0 ? 'Active opportunities' : 'No active opportunities'}></div>
                             </div>
 
