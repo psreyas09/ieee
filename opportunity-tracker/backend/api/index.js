@@ -315,6 +315,30 @@ const computeSuccessRate = (successCount, failedCount) => {
     return Number(((successCount / total) * 100).toFixed(1));
 };
 
+const isMissingScrapeRunLogTableError = (error) => {
+    const prismaCode = error?.code;
+    const tableFromMeta = String(error?.meta?.table || '').toLowerCase();
+    const message = String(error?.message || '').toLowerCase();
+
+    return prismaCode === 'P2021'
+        && (
+            tableFromMeta.includes('scraperunlog')
+            || message.includes('scraperunlog')
+        );
+};
+
+const buildScrapeHealthFallbackRow = (organization) => ({
+    organizationId: organization.id,
+    organizationName: organization.name,
+    lastScrapedAt: organization.lastScrapedAt || null,
+    lastStatus: 'unknown',
+    lastError: null,
+    success7d: 0,
+    failed7d: 0,
+    opportunitiesAdded7d: 0,
+    successRate: 0
+});
+
 // --- Middleware ---
 const authenticateAdmin = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -546,18 +570,31 @@ app.get('/api/admin/scrape-health', authenticateAdmin, async (req, res) => {
         const orgIds = organizations.map(org => org.id);
         const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
 
-        const [latestRuns, weeklyRuns] = await Promise.all([
-            prisma.scrapeRunLog.findMany({
-                where: { organizationId: { in: orgIds } },
-                orderBy: { startedAt: 'desc' }
-            }),
-            prisma.scrapeRunLog.findMany({
-                where: {
-                    organizationId: { in: orgIds },
-                    startedAt: { gte: sevenDaysAgo }
-                }
-            })
-        ]);
+        let latestRuns = [];
+        let weeklyRuns = [];
+
+        try {
+            [latestRuns, weeklyRuns] = await Promise.all([
+                prisma.scrapeRunLog.findMany({
+                    where: { organizationId: { in: orgIds } },
+                    orderBy: { startedAt: 'desc' }
+                }),
+                prisma.scrapeRunLog.findMany({
+                    where: {
+                        organizationId: { in: orgIds },
+                        startedAt: { gte: sevenDaysAgo }
+                    }
+                })
+            ]);
+        } catch (error) {
+            if (!isMissingScrapeRunLogTableError(error)) throw error;
+
+            console.warn('ScrapeRunLog table missing. Returning scrape health fallback data. Apply Prisma migrations in production.');
+            return res.json({
+                data: organizations.map(buildScrapeHealthFallbackRow),
+                warning: 'ScrapeRunLog table missing. Run Prisma migration to enable scrape health metrics.'
+            });
+        }
 
         const latestRunByOrg = new Map();
         for (const run of latestRuns) {
@@ -620,18 +657,31 @@ app.get('/api/admin/scrape-health/:orgId', authenticateAdmin, async (req, res) =
         }
 
         const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
-        const [latestRun, weeklyRuns] = await Promise.all([
-            prisma.scrapeRunLog.findFirst({
-                where: { organizationId: organization.id },
-                orderBy: { startedAt: 'desc' }
-            }),
-            prisma.scrapeRunLog.findMany({
-                where: {
-                    organizationId: organization.id,
-                    startedAt: { gte: sevenDaysAgo }
-                }
-            })
-        ]);
+        let latestRun = null;
+        let weeklyRuns = [];
+
+        try {
+            [latestRun, weeklyRuns] = await Promise.all([
+                prisma.scrapeRunLog.findFirst({
+                    where: { organizationId: organization.id },
+                    orderBy: { startedAt: 'desc' }
+                }),
+                prisma.scrapeRunLog.findMany({
+                    where: {
+                        organizationId: organization.id,
+                        startedAt: { gte: sevenDaysAgo }
+                    }
+                })
+            ]);
+        } catch (error) {
+            if (!isMissingScrapeRunLogTableError(error)) throw error;
+
+            console.warn(`ScrapeRunLog table missing. Returning fallback scrape health for org ${organization.id}.`);
+            return res.json({
+                data: buildScrapeHealthFallbackRow(organization),
+                warning: 'ScrapeRunLog table missing. Run Prisma migration to enable scrape health metrics.'
+            });
+        }
 
         const success7d = weeklyRuns.filter(run => run.status === 'success').length;
         const failed7d = weeklyRuns.filter(run => run.status === 'failed').length;
