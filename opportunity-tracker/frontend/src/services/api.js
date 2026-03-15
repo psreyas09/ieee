@@ -26,6 +26,9 @@ export const triggerScrape = (orgId) => api.post(`/admin/scrape/${orgId}`).then(
 export const createOpportunity = (data) => api.post('/admin/opportunities', data).then(res => res.data);
 export const updateOpportunity = (id, data) => api.put(`/admin/opportunities/${id}`, data).then(res => res.data);
 export const deleteOpportunity = (id) => api.delete(`/admin/opportunities/${id}`).then(res => res.data);
+export const createOrganization = (data) => api.post('/admin/organizations', data).then(res => res.data);
 export const updateOrganization = (id, data) => api.put(`/admin/organizations/${id}`, data).then(res => res.data);
+export const addOrganizationScrapeUrl = (id, url) => api.post(`/admin/organizations/${id}/scrape-urls`, { url }).then(res => res.data);
+export const deleteOrganizationScrapeUrl = (id, url) => api.delete(`/admin/organizations/${id}/scrape-urls`, { data: { url } }).then(res => res.data);
 
 export default api;

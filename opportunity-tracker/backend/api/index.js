@@ -11,6 +11,44 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
+const isValidHttpUrl = (value) => {
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+};
+
+const parseScrapeUrls = (value) => {
+    if (Array.isArray(value)) {
+        return [...new Set(value.map(v => String(v).trim()).filter(Boolean))];
+    }
+
+    if (typeof value !== 'string') return [];
+
+    return [...new Set(
+        value
+            .split(/\r?\n|,/)
+            .map(v => v.trim())
+            .filter(Boolean)
+    )];
+};
+
+const serializeScrapeUrls = (urls) => {
+    const normalized = parseScrapeUrls(urls);
+    return normalized.length > 0 ? normalized.join('\n') : null;
+};
+
+const toOrganizationResponse = (org) => {
+    const scrapeUrls = parseScrapeUrls(org.scrapeUrl);
+    return {
+        ...org,
+        scrapeUrls,
+        scrapeUrl: scrapeUrls[0] || null
+    };
+};
+
 // --- Middleware ---
 const authenticateAdmin = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -75,7 +113,7 @@ app.get('/api/organizations', async (req, res) => {
             },
             orderBy: { name: 'asc' }
         });
-        res.json(organizations);
+        res.json(organizations.map(toOrganizationResponse));
     } catch (error) {
         console.error('Error fetching organizations:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -548,21 +586,113 @@ app.delete('/api/admin/opportunities/:id', authenticateAdmin, async (req, res) =
     }
 });
 
+app.post('/api/admin/organizations', authenticateAdmin, async (req, res) => {
+    try {
+        const { name, type, officialWebsite, scrapeUrl, scrapeUrls } = req.body;
+
+        const cleanedName = typeof name === 'string' ? name.trim() : '';
+        const cleanedType = typeof type === 'string' ? type.trim().toLowerCase() : '';
+
+        if (!cleanedName) {
+            return res.status(400).json({ error: 'Organization name is required.' });
+        }
+
+        if (!['society', 'council', 'region'].includes(cleanedType)) {
+            return res.status(400).json({ error: 'Organization type must be society, council, or region.' });
+        }
+
+        const nextOfficialWebsite = typeof officialWebsite === 'string' ? officialWebsite.trim() : null;
+        if (nextOfficialWebsite && !isValidHttpUrl(nextOfficialWebsite)) {
+            return res.status(400).json({ error: 'Invalid officialWebsite. Must be a valid http(s) URL.' });
+        }
+
+        const nextScrapeUrls = parseScrapeUrls(scrapeUrls !== undefined ? scrapeUrls : scrapeUrl);
+        const invalidUrl = nextScrapeUrls.find(url => !isValidHttpUrl(url));
+        if (invalidUrl) {
+            return res.status(400).json({ error: `Invalid scrape URL: ${invalidUrl}` });
+        }
+
+        const existing = await prisma.organization.findFirst({ where: { name: cleanedName } });
+        if (existing) {
+            return res.status(409).json({ error: 'Organization with this name already exists.' });
+        }
+
+        const org = await prisma.organization.create({
+            data: {
+                name: cleanedName,
+                type: cleanedType,
+                officialWebsite: nextOfficialWebsite,
+                scrapeUrl: serializeScrapeUrls(nextScrapeUrls)
+            }
+        });
+
+        res.json(toOrganizationResponse(org));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/admin/organizations/:id/scrape-urls', authenticateAdmin, async (req, res) => {
+    try {
+        const { url } = req.body;
+        const nextUrl = typeof url === 'string' ? url.trim() : '';
+
+        if (!nextUrl || !isValidHttpUrl(nextUrl)) {
+            return res.status(400).json({ error: 'Invalid URL. Must be a valid http(s) URL.' });
+        }
+
+        const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
+        if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+        const updated = [...new Set([...parseScrapeUrls(org.scrapeUrl), nextUrl])];
+        const saved = await prisma.organization.update({
+            where: { id: req.params.id },
+            data: { scrapeUrl: serializeScrapeUrls(updated) }
+        });
+
+        res.json(toOrganizationResponse(saved));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/admin/organizations/:id/scrape-urls', authenticateAdmin, async (req, res) => {
+    try {
+        const { url } = req.body;
+        const targetUrl = typeof url === 'string' ? url.trim() : '';
+
+        if (!targetUrl) {
+            return res.status(400).json({ error: 'URL is required for deletion.' });
+        }
+
+        const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
+        if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+        const updated = parseScrapeUrls(org.scrapeUrl).filter(existing => existing !== targetUrl);
+        const saved = await prisma.organization.update({
+            where: { id: req.params.id },
+            data: { scrapeUrl: serializeScrapeUrls(updated) }
+        });
+
+        res.json(toOrganizationResponse(saved));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.put('/api/admin/organizations/:id', authenticateAdmin, async (req, res) => {
     try {
-        const { scrapeUrl, name, officialWebsite } = req.body;
+        const { scrapeUrl, scrapeUrls, name, officialWebsite } = req.body;
 
-        const isValidHttpUrl = (value) => {
-            try {
-                const parsed = new URL(value);
-                return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-            } catch {
-                return false;
+        let nextScrapeUrl;
+        const hasScrapeUrlPayload = scrapeUrls !== undefined || scrapeUrl !== undefined;
+        if (hasScrapeUrlPayload) {
+            const nextScrapeUrls = parseScrapeUrls(scrapeUrls !== undefined ? scrapeUrls : scrapeUrl);
+            const invalidUrl = nextScrapeUrls.find(url => !isValidHttpUrl(url));
+            if (invalidUrl) {
+                return res.status(400).json({ error: `Invalid scrape URL: ${invalidUrl}` });
             }
-        };
-
-        if (typeof scrapeUrl === 'string' && scrapeUrl.trim() && !isValidHttpUrl(scrapeUrl.trim())) {
-            return res.status(400).json({ error: 'Invalid scrapeUrl. Must be a valid http(s) URL.' });
+            nextScrapeUrl = serializeScrapeUrls(nextScrapeUrls);
         }
 
         if (typeof officialWebsite === 'string' && officialWebsite.trim() && !isValidHttpUrl(officialWebsite.trim())) {
@@ -572,12 +702,12 @@ app.put('/api/admin/organizations/:id', authenticateAdmin, async (req, res) => {
         const org = await prisma.organization.update({
             where: { id: req.params.id },
             data: {
-                scrapeUrl: typeof scrapeUrl === 'string' ? scrapeUrl.trim() : undefined,
+                scrapeUrl: hasScrapeUrlPayload ? nextScrapeUrl : undefined,
                 name: typeof name === 'string' ? name.trim() : undefined,
                 officialWebsite: typeof officialWebsite === 'string' ? officialWebsite.trim() : undefined
             }
         });
-        res.json(org);
+        res.json(toOrganizationResponse(org));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

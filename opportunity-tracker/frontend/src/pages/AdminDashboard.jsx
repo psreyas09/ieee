@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOrganization } from '../services/api';
+import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOrganization, createOrganization, addOrganizationScrapeUrl, deleteOrganizationScrapeUrl } from '../services/api';
 import { Activity, Trash2, ExternalLink, RefreshCw, LogOut, PlusCircle, X, Pencil } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -53,6 +53,22 @@ export default function AdminDashboard() {
     const showToast = (msg) => {
         setToast(msg);
         setTimeout(() => setToast(''), 5000);
+    };
+
+    const getScrapeUrls = (org) => {
+        if (Array.isArray(org.scrapeUrls) && org.scrapeUrls.length > 0) {
+            return org.scrapeUrls;
+        }
+        return org.scrapeUrl ? [org.scrapeUrl] : [];
+    };
+
+    const isValidHttpUrl = (value) => {
+        try {
+            const parsed = new URL(value);
+            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        } catch {
+            return false;
+        }
     };
 
     const handleScrape = async (orgId, orgName) => {
@@ -117,10 +133,39 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleUpdateScrapeUrl = async (org) => {
-        const currentUrl = org.scrapeUrl || '';
-        const actionLabel = org.scrapeUrl ? 'Update' : 'Add';
-        const nextUrl = prompt(`${actionLabel} scrape URL for ${org.name}`, currentUrl);
+    const handleManageScrapeUrls = async (org) => {
+        const currentUrls = getScrapeUrls(org);
+        const nextValue = prompt(
+            `Manage scrape URLs for ${org.name}. Enter one URL per line. Remove a line to delete it.`,
+            currentUrls.join('\n')
+        );
+
+        if (nextValue === null) return;
+
+        const nextUrls = [...new Set(
+            nextValue
+                .split(/\r?\n/)
+                .map(url => url.trim())
+                .filter(Boolean)
+        )];
+
+        const invalid = nextUrls.find(url => !isValidHttpUrl(url));
+        if (invalid) {
+            showToast(`Invalid URL: ${invalid}`);
+            return;
+        }
+
+        try {
+            await updateOrganization(org.id, { scrapeUrls: nextUrls });
+            showToast('Scrape URLs updated successfully.');
+            fetchData();
+        } catch (error) {
+            showToast(error.response?.data?.error || 'Failed to update scrape URLs.');
+        }
+    };
+
+    const handleAddScrapeUrl = async (org) => {
+        const nextUrl = prompt(`Add a new scrape URL for ${org.name}`);
 
         if (nextUrl === null) return;
 
@@ -130,23 +175,87 @@ export default function AdminDashboard() {
             return;
         }
 
-        try {
-            const parsed = new URL(cleaned);
-            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-                showToast('Invalid URL: use http or https.');
-                return;
-            }
-        } catch {
+        if (!isValidHttpUrl(cleaned)) {
             showToast('Invalid URL format.');
             return;
         }
 
         try {
-            await updateOrganization(org.id, { scrapeUrl: cleaned });
-            showToast('Scrape URL updated successfully.');
+            await addOrganizationScrapeUrl(org.id, cleaned);
+            showToast('Scrape URL added successfully.');
             fetchData();
         } catch (error) {
-            showToast('Failed to update scrape URL.');
+            showToast(error.response?.data?.error || 'Failed to add scrape URL.');
+        }
+    };
+
+    const handleDeleteScrapeUrl = async (org, url) => {
+        if (!confirm(`Delete this scrape URL for ${org.name}?\n${url}`)) return;
+
+        try {
+            await deleteOrganizationScrapeUrl(org.id, url);
+            showToast('Scrape URL removed.');
+            fetchData();
+        } catch (error) {
+            showToast(error.response?.data?.error || 'Failed to remove scrape URL.');
+        }
+    };
+
+    const handleCreateOrganization = async () => {
+        const name = prompt('Organization name');
+        if (name === null) return;
+
+        const cleanedName = name.trim();
+        if (!cleanedName) {
+            showToast('Organization name is required.');
+            return;
+        }
+
+        const type = prompt('Organization type: society, council, or region', 'society');
+        if (type === null) return;
+
+        const cleanedType = type.trim().toLowerCase();
+        if (!['society', 'council', 'region'].includes(cleanedType)) {
+            showToast('Type must be society, council, or region.');
+            return;
+        }
+
+        const officialWebsiteInput = prompt('Official website URL (optional)', '');
+        if (officialWebsiteInput === null) return;
+        const officialWebsite = officialWebsiteInput.trim();
+
+        if (officialWebsite && !isValidHttpUrl(officialWebsite)) {
+            showToast('Official website must be a valid http(s) URL.');
+            return;
+        }
+
+        const scrapeUrlsInput = prompt('Scrape URLs (optional). Enter one URL per line.', officialWebsite || '');
+        if (scrapeUrlsInput === null) return;
+
+        const scrapeUrls = [...new Set(
+            scrapeUrlsInput
+                .split(/\r?\n/)
+                .map(url => url.trim())
+                .filter(Boolean)
+        )];
+
+        const invalid = scrapeUrls.find(url => !isValidHttpUrl(url));
+        if (invalid) {
+            showToast(`Invalid scrape URL: ${invalid}`);
+            return;
+        }
+
+        try {
+            await createOrganization({
+                name: cleanedName,
+                type: cleanedType,
+                officialWebsite: officialWebsite || null,
+                scrapeUrls
+            });
+            showToast('Organization created successfully.');
+            fetchData();
+        } catch (error) {
+            showToast(error.response?.data?.error || 'Failed to create organization.');
         }
     };
 
@@ -201,13 +310,23 @@ export default function AdminDashboard() {
                             <h2 className="font-bold text-slate-800">Trigger Scraping</h2>
                             <p className="text-xs text-slate-500 mt-1">Free-tier safe calls to Gemini API.</p>
                         </div>
-                        <button
-                            onClick={handleScrapeAll}
-                            disabled={isScrapingAll || scrapingId !== null}
-                            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${isScrapingAll ? 'bg-slate-200 text-slate-500' : 'bg-ieee-blue text-white hover:bg-blue-700 shadow-sm'}`}
-                        >
-                            {isScrapingAll ? 'Scraping...' : 'Scrape All'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleCreateOrganization}
+                                disabled={isScrapingAll || scrapingId !== null}
+                                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1.5 ${isScrapingAll || scrapingId !== null ? 'bg-slate-200 text-slate-500' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'}`}
+                                title="Add New Organization"
+                            >
+                                <PlusCircle size={14} /> Add Org
+                            </button>
+                            <button
+                                onClick={handleScrapeAll}
+                                disabled={isScrapingAll || scrapingId !== null}
+                                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${isScrapingAll ? 'bg-slate-200 text-slate-500' : 'bg-ieee-blue text-white hover:bg-blue-700 shadow-sm'}`}
+                            >
+                                {isScrapingAll ? 'Scraping...' : 'Scrape All'}
+                            </button>
+                        </div>
                     </div>
 
                     {isScrapingAll && scrapeProgress && (
@@ -226,12 +345,32 @@ export default function AdminDashboard() {
                     <div className="overflow-y-auto flex-grow p-4 space-y-3">
                         {orgs.map(org => (
                             <div key={org.id} className="border border-slate-200 rounded-lg p-3 hover:border-ieee-blue/30 transition-colors">
+                                {(() => {
+                                    const scrapeUrls = getScrapeUrls(org);
+                                    return (
                                 <div className="flex justify-between items-center">
                                     <div>
                                         <p className="font-semibold text-sm text-slate-800">{org.name}</p>
                                         <p className="text-xs text-slate-500 mt-0.5">
                                             Last: {org.lastScrapedAt ? new Date(org.lastScrapedAt).toLocaleString() : 'Never'}
                                         </p>
+                                        <div className="mt-2 space-y-1">
+                                            {scrapeUrls.length > 0 ? scrapeUrls.map((url) => (
+                                                <div key={url} className="flex items-center gap-1.5">
+                                                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md truncate max-w-[210px]" title={url}>
+                                                        {url}
+                                                    </a>
+                                                    <button
+                                                        onClick={() => handleDeleteScrapeUrl(org, url)}
+                                                        disabled={scrapingId !== null || isScrapingAll}
+                                                        className={`p-1 rounded ${scrapingId !== null || isScrapingAll ? 'text-slate-300' : 'text-red-500 hover:bg-red-50'} transition-colors`}
+                                                        title="Delete this scrape URL"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </div>
+                                            )) : <p className="text-[11px] text-amber-700 bg-amber-50 px-2 py-1 rounded-md inline-block">No scrape URLs configured</p>}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 flex-shrink-0">
                                         <button
@@ -243,15 +382,25 @@ export default function AdminDashboard() {
                                             <RefreshCw size={16} className={scrapingId === org.id ? 'animate-spin' : ''} />
                                         </button>
                                         <button
-                                            onClick={() => handleUpdateScrapeUrl(org)}
+                                            onClick={() => handleAddScrapeUrl(org)}
                                             disabled={scrapingId !== null || isScrapingAll}
-                                            className={`p-2 rounded-md ${scrapingId !== null || isScrapingAll ? 'bg-slate-50 text-slate-300' : org.scrapeUrl ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'} transition-colors`}
-                                            title={org.scrapeUrl ? 'Edit Scrape URL' : 'Add Scrape URL'}
+                                            className={`p-2 rounded-md ${scrapingId !== null || isScrapingAll ? 'bg-slate-50 text-slate-300' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'} transition-colors`}
+                                            title="Add Scrape URL"
                                         >
-                                            {org.scrapeUrl ? <Pencil size={16} /> : <PlusCircle size={16} />}
+                                            <PlusCircle size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleManageScrapeUrls(org)}
+                                            disabled={scrapingId !== null || isScrapingAll}
+                                            className={`p-2 rounded-md ${scrapingId !== null || isScrapingAll ? 'bg-slate-50 text-slate-300' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} transition-colors`}
+                                            title="Edit All Scrape URLs"
+                                        >
+                                            <Pencil size={16} />
                                         </button>
                                     </div>
                                 </div>
+                                    );
+                                })()}
                             </div>
                         ))}
                     </div>

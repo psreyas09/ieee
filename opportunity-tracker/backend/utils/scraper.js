@@ -23,6 +23,22 @@ let nextGeminiClientIndex = 0;
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+function parseOrganizationScrapeUrls(organization) {
+    const fromArray = Array.isArray(organization.scrapeUrls)
+        ? organization.scrapeUrls
+        : [];
+
+    const fromField = typeof organization.scrapeUrl === 'string'
+        ? organization.scrapeUrl.split(/\r?\n|,/)
+        : [];
+
+    const combined = [...fromArray, ...fromField]
+        .map(url => String(url).trim())
+        .filter(Boolean);
+
+    return [...new Set(combined)];
+}
+
 function getGeminiClientOrder() {
     if (geminiClients.length <= 1) {
         return geminiClients.map((client, index) => ({ client, keyNumber: index + 1 }));
@@ -190,24 +206,29 @@ async function scrapeOrganization(organization) {
         throw new Error('GEMINI_API_KEY is missing');
     }
 
-    const primaryUrl = organization.scrapeUrl || organization.officialWebsite;
-    if (!primaryUrl) {
+    const configuredUrls = parseOrganizationScrapeUrls(organization);
+    const fallbackUrl = organization.officialWebsite ? String(organization.officialWebsite).trim() : '';
+    const candidateUrls = [...configuredUrls, fallbackUrl].filter(Boolean);
+
+    if (candidateUrls.length === 0) {
         throw new Error(`Organization ${organization.name} has no URL configured to scrape.`);
     }
 
-    let text;
-    try {
-        text = await fetchAndExtractText(primaryUrl);
-    } catch (error) {
-        const canFallback = organization.scrapeUrl && organization.officialWebsite && organization.scrapeUrl !== organization.officialWebsite;
-        const is404 = (error.message || '').includes('status code 404');
+    let text = null;
+    let lastError = null;
 
-        if (!canFallback || !is404) {
-            throw error;
+    for (const url of candidateUrls) {
+        try {
+            text = await fetchAndExtractText(url);
+            break;
+        } catch (error) {
+            lastError = error;
+            console.warn(`Failed to fetch ${url} for ${organization.name}. Trying next URL if available...`);
         }
+    }
 
-        console.warn(`Primary scrape URL failed for ${organization.name}. Retrying with official website...`);
-        text = await fetchAndExtractText(organization.officialWebsite);
+    if (!text) {
+        throw lastError || new Error(`Failed to fetch any scrape URL for ${organization.name}.`);
     }
 
     // 2. Send to Gemini
