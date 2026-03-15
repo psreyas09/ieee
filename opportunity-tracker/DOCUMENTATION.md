@@ -25,6 +25,7 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 	- `scrapeUrl` now supports multiple explicit URLs stored as newline-delimited values and exposed as `scrapeUrls[]` in API responses
 - `Opportunity`: scraped and manual opportunities
 - `AdminUser`: admin authentication records
+- `ScrapeRunLog`: scrape run telemetry (`organizationId`, `startedAt`, `endedAt`, `status`, `errorMessage`, `opportunitiesFound`, `opportunitiesAdded`, `source`)
 
 ## Scraping Pipeline
 
@@ -59,6 +60,9 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - Add explicit scrape URL (`/api/admin/organizations/:id/scrape-urls`)
 - Delete explicit scrape URL (`/api/admin/organizations/:id/scrape-urls`)
 - UI supports add/edit/delete for explicit scrape URLs and shows fallback website URL
+- Scrape Health section with sortable reliability table and failed-only quick filter
+- Duplicate Merge panel with grouped duplicate candidates, selectable primary record, and merge action
+- Scrape Health and Duplicate Merge sections are collapsed by default and expand on button click
 
 ## Recent Reliability and UX Additions
 
@@ -77,6 +81,14 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 7. Seed and maintenance safety:
 	 - `seed.js` is idempotent/non-destructive for organizations and admin user
 	 - `/api/admin/force-seed` no longer overwrites existing custom Student Activities scrape URL
+8. Phase 1 reliability + dedup tooling:
+	 - scrape run logging added to both manual scrape and cron scrape flows
+	 - scrape health APIs provide 7-day success/failure/add metrics and last error visibility
+	 - duplicate detection groups opportunities and recommends primary record
+	 - merge endpoint safely consolidates duplicates into one primary record
+9. Production hardening:
+	 - scrape health endpoint no longer hard-fails if `ScrapeRunLog` migration is pending; returns fallback payload with warning
+	 - admin dashboard uses partial-load fetch strategy so one failing section does not blank the full page
 
 ## API Surface (Key Endpoints)
 
@@ -89,6 +101,10 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 ### Admin (JWT required)
 - `POST /api/admin/login`
 - `POST /api/admin/scrape/:id`
+- `GET /api/admin/scrape-health`
+- `GET /api/admin/scrape-health/:orgId`
+- `GET /api/admin/duplicates`
+- `POST /api/admin/duplicates/merge`
 - `POST /api/admin/opportunities`
 - `PUT /api/admin/opportunities/:id`
 - `DELETE /api/admin/opportunities/:id`
@@ -142,4 +158,12 @@ Expected: JSON with `message` and `results`.
 UPDATE "Organization"
 SET "scrapeUrl" = 'https://students.ieee.org/'
 WHERE "name" = 'IEEE Student Activities';
+```
+
+### Scrape Health migration prerequisite (production)
+If scrape health endpoint reports a warning/fallback or previously returned `500`, apply migrations to create `ScrapeRunLog`:
+
+```bash
+cd backend
+npx prisma migrate deploy
 ```

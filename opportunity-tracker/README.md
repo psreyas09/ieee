@@ -8,6 +8,12 @@ A full-stack web application designed for IEEE student members to discover compe
 - AI Scraping: Cheerio API & Google Gemini 2.5 Flash
 
 ## Recent Feature Updates
+- Phase 1 Admin Intelligence shipped:
+   - Scrape Health dashboard metrics per organization (last status, failures, 7-day success/fail/add counts, success rate)
+   - Duplicate Merge tool with grouped candidate detection and safe merge into a selected primary record
+   - Admin UI now keeps these heavy sections collapsed by default and expands on demand
+   - Admin dashboard data loading is resilient to partial API failures (existing data still renders)
+- Scrape health endpoints now include a production-safe fallback if `ScrapeRunLog` migration is pending.
 - Admin dashboard now supports full scrape URL management per organization:
    - add a new scrape URL
    - edit all explicit scrape URLs (one per line)
@@ -25,6 +31,34 @@ A full-stack web application designed for IEEE student members to discover compe
 - Gemini quota handling improved:
    - returns `429` (instead of generic `500`) when AI quota is exhausted
    - supports multi-key failover across `GEMINI_API_KEY` and `GEMINI_API_KEY_2`
+
+## Phase 1 Endpoints
+
+### Admin Scrape Health (JWT required)
+- `GET /api/admin/scrape-health`
+- `GET /api/admin/scrape-health/:orgId`
+
+Returns per-organization scrape reliability data:
+- `organizationId`, `organizationName`
+- `lastScrapedAt`, `lastStatus`, `lastError`
+- `success7d`, `failed7d`, `opportunitiesAdded7d`, `successRate`
+
+If migration has not been applied yet, endpoint returns fallback rows with a warning (instead of failing with `500`).
+
+### Admin Duplicate Merge (JWT required)
+- `GET /api/admin/duplicates`
+- `POST /api/admin/duplicates/merge`
+
+Duplicate detection heuristic:
+- same organization
+- title similarity threshold
+- optional date proximity guard
+
+Merge behavior:
+- keeps selected primary opportunity id
+- merges best non-empty/newer fields into primary
+- deletes selected duplicate ids
+- disallows cross-organization merge by default
 
 ## Project Structure
 This repository uses a monorepo structure configured for automated Vercel deployments.
@@ -89,9 +123,11 @@ When deploying to Vercel, **you do not use `.env` files.** Instead, you must add
    ```bash
    cd backend
    npx prisma generate
-   npx prisma db push
+   npx prisma migrate deploy
    node prisma/seed.js
    ```
+
+   For local schema iteration during development, `npx prisma migrate dev` is recommended.
 
 3. **Run Locally**
    - Start Backend: `cd backend && npm run dev` (Runs on `localhost:3000`)
@@ -155,3 +191,13 @@ WHERE "name" = 'IEEE Student Activities';
 ```
 
 Then retry scraping from Admin.
+
+### If `/api/admin/scrape-health` returns `500`
+This usually means the new `ScrapeRunLog` table migration has not been applied to production DB.
+
+Run in backend:
+```bash
+npx prisma migrate deploy
+```
+
+Then redeploy/restart backend.
