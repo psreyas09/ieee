@@ -87,6 +87,10 @@ async function fetchAndExtractText(url) {
         // Extract raw text and clean it
         let extractedText = $('body').text().replace(/\s+/g, ' ').trim();
 
+        if (extractedText.length < 120) {
+            throw new Error('Page returned too little readable text (likely JS-rendered or blocked). Try a deeper content URL.');
+        }
+
         // Limit to 12000 characters to fit well within Gemini's context window easily
         // while providing enough signal.
         if (extractedText.length > 12000) {
@@ -216,6 +220,7 @@ async function scrapeOrganization(organization) {
 
     let text = null;
     let lastError = null;
+    const attemptErrors = [];
 
     for (const url of candidateUrls) {
         try {
@@ -223,12 +228,14 @@ async function scrapeOrganization(organization) {
             break;
         } catch (error) {
             lastError = error;
+            attemptErrors.push(`${url} -> ${error.message}`);
             console.warn(`Failed to fetch ${url} for ${organization.name}. Trying next URL if available...`);
         }
     }
 
     if (!text) {
-        throw lastError || new Error(`Failed to fetch any scrape URL for ${organization.name}.`);
+        const details = attemptErrors.length > 0 ? ` Attempts: ${attemptErrors.join(' | ')}` : '';
+        throw new Error(`Failed to fetch any scrape URL for ${organization.name}.${details}`);
     }
 
     // 2. Send to Gemini
