@@ -8,10 +8,15 @@ A full-stack web application designed for IEEE student members to discover compe
 - AI Scraping: Cheerio API & Google Gemini 2.5 Flash
 
 ## Recent Feature Updates
-- Admin dashboard now includes an in-place **Edit Scrape URL** action for each organization.
+- Admin dashboard now supports full scrape URL management per organization:
+   - add a new scrape URL
+   - edit all explicit scrape URLs (one per line)
+   - delete individual explicit scrape URLs
+   - show `officialWebsite` as labeled fallback URL when no explicit scrape URL exists
+- Admin dashboard now supports creating a **new organization** with type, official website, and scrape URLs.
 - Admin dashboard now auto-refreshes organizations/opportunities every 30 seconds.
 - Backend validates `scrapeUrl` and `officialWebsite` on admin updates (must be valid `http(s)` URLs).
-- Scraper now falls back from `scrapeUrl` to `officialWebsite` when the primary URL returns `404`.
+- Scraper now tries all configured scrape URLs for an organization, then falls back to `officialWebsite`.
 - Student Activities defaults were corrected to `https://students.ieee.org/`.
 - Cron scraping was hardened for Vercel serverless behavior:
    - clearer error if `CRON_SECRET` is missing
@@ -118,6 +123,17 @@ Expected response: JSON object containing `message` and `results`.
 - `500 CRON_SECRET is missing`: add `CRON_SECRET` in Vercel env vars and redeploy.
 - `Cannot GET /api/cron/scrape-batch`: old deployment is serving; deploy latest commit and verify project root/repo settings.
 - `429 Google AI quota/rate-limit exceeded`: Gemini key(s) exhausted; wait for reset or configure secondary key(s).
+
+## Admin Organization Management
+
+- Add organization: available from Admin via `Add Org` (name, type, official website, scrape URLs).
+- Manage scrape URLs per org:
+   - Add URL button adds one explicit scrape URL.
+   - Pencil button edits full explicit URL list.
+   - X button deletes one explicit URL.
+- Fallback behavior:
+   - If no explicit scrape URLs are configured, scraper uses `officialWebsite`.
+   - The fallback URL is displayed in Admin with a `fallback` label.
 
 ## Production Troubleshooting
 

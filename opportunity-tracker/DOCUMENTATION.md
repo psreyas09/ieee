@@ -22,13 +22,14 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 
 ### Database Models
 - `Organization`: source entities and scrape metadata (`scrapeUrl`, `officialWebsite`, `lastScrapedAt`)
+	- `scrapeUrl` now supports multiple explicit URLs stored as newline-delimited values and exposed as `scrapeUrls[]` in API responses
 - `Opportunity`: scraped and manual opportunities
 - `AdminUser`: admin authentication records
 
 ## Scraping Pipeline
 
 ### Ingestion flow
-1. Choose target URL: `scrapeUrl` first, fallback to `officialWebsite`.
+1. Choose target URLs: all explicit `scrapeUrls` (or parsed `scrapeUrl`) first, then `officialWebsite` fallback.
 2. Fetch HTML with browser-like headers.
 3. Remove non-content tags and extract body text.
 4. Limit extracted content length for model safety.
@@ -53,8 +54,11 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - Sequential "Scrape All" from UI
 - Auto-refresh of dashboard data every 30 seconds
 - CRUD for manual opportunities
+- Create organization (`/api/admin/organizations`)
 - Update organization data (`/api/admin/organizations/:id`)
-- Edit scrape URL directly in dashboard UI (pencil action)
+- Add explicit scrape URL (`/api/admin/organizations/:id/scrape-urls`)
+- Delete explicit scrape URL (`/api/admin/organizations/:id/scrape-urls`)
+- UI supports add/edit/delete for explicit scrape URLs and shows fallback website URL
 
 ## Recent Reliability and UX Additions
 
@@ -70,6 +74,9 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 	 - returns `429` for quota exhaustion in admin scrape endpoint
 	 - includes `retryAfterSec` when available from provider response
 	 - rotates/fails over to secondary configured key(s)
+7. Seed and maintenance safety:
+	 - `seed.js` is idempotent/non-destructive for organizations and admin user
+	 - `/api/admin/force-seed` no longer overwrites existing custom Student Activities scrape URL
 
 ## API Surface (Key Endpoints)
 
@@ -85,7 +92,10 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - `POST /api/admin/opportunities`
 - `PUT /api/admin/opportunities/:id`
 - `DELETE /api/admin/opportunities/:id`
+- `POST /api/admin/organizations`
 - `PUT /api/admin/organizations/:id`
+- `POST /api/admin/organizations/:id/scrape-urls`
+- `DELETE /api/admin/organizations/:id/scrape-urls`
 
 ### System
 - `GET /api/cron/scrape-batch` (requires `Authorization: Bearer <CRON_SECRET>`)
