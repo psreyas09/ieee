@@ -110,7 +110,30 @@ async function fetchAndExtractText(url) {
         let extractedText = $('body').text().replace(/\s+/g, ' ').trim();
 
         if (extractedText.length < 120) {
-            throw new Error('Page returned too little readable text (likely JS-rendered or blocked). Try a deeper content URL.');
+            // JS-heavy sites may expose little body text in static HTML.
+            // Use metadata + anchor text as a secondary signal instead of hard-failing.
+            const metaPieces = [
+                $('title').text(),
+                $('meta[name="description"]').attr('content'),
+                $('meta[property="og:title"]').attr('content'),
+                $('meta[property="og:description"]').attr('content')
+            ].filter(Boolean);
+
+            const linkText = $('a')
+                .map((_, el) => $(el).text().trim())
+                .get()
+                .filter(Boolean)
+                .slice(0, 200)
+                .join(' ');
+
+            const fallbackText = `${metaPieces.join(' ')} ${linkText}`.replace(/\s+/g, ' ').trim();
+            if (fallbackText.length > extractedText.length) {
+                extractedText = fallbackText;
+            }
+        }
+
+        if (extractedText.length < 20) {
+            throw new Error('Page returned almost no readable text (likely JS-rendered or blocked). Try a deeper content URL.');
         }
 
         // Limit to 12000 characters to fit well within Gemini's context window easily
