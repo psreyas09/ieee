@@ -30,5 +30,8 @@ export const createOrganization = (data) => api.post('/admin/organizations', dat
 export const updateOrganization = (id, data) => api.put(`/admin/organizations/${id}`, data).then(res => res.data);
 export const addOrganizationScrapeUrl = (id, url) => api.post(`/admin/organizations/${id}/scrape-urls`, { url }).then(res => res.data);
 export const deleteOrganizationScrapeUrl = (id, url) => api.delete(`/admin/organizations/${id}/scrape-urls`, { data: { url } }).then(res => res.data);
+export const getScrapeHealth = () => api.get('/admin/scrape-health').then(res => res.data);
+export const getDuplicateGroups = () => api.get('/admin/duplicates').then(res => res.data);
+export const mergeDuplicates = (payload) => api.post('/admin/duplicates/merge', payload).then(res => res.data);
 
 export default api;

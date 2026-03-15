@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOrganization, createOrganization, addOrganizationScrapeUrl, deleteOrganizationScrapeUrl } from '../services/api';
+import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOrganization, createOrganization, addOrganizationScrapeUrl, deleteOrganizationScrapeUrl, getScrapeHealth, getDuplicateGroups, mergeDuplicates } from '../services/api';
 import { Activity, Trash2, ExternalLink, RefreshCw, LogOut, PlusCircle, X, Pencil } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -14,6 +14,13 @@ export default function AdminDashboard() {
     const [totalPages, setTotalPages] = useState(1);
     const [isScrapingAll, setIsScrapingAll] = useState(false);
     const [scrapeProgress, setScrapeProgress] = useState(null);
+    const [scrapeHealthRows, setScrapeHealthRows] = useState([]);
+    const [healthSortBy, setHealthSortBy] = useState('org');
+    const [healthSortDir, setHealthSortDir] = useState('asc');
+    const [failedOnly, setFailedOnly] = useState(false);
+    const [duplicateGroups, setDuplicateGroups] = useState([]);
+    const [duplicateSelection, setDuplicateSelection] = useState({});
+    const [isMergingGroup, setIsMergingGroup] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
@@ -33,13 +40,30 @@ export default function AdminDashboard() {
 
     const fetchData = async () => {
         try {
-            const [orgsData, oppsData] = await Promise.all([
+            const [orgsData, oppsData, scrapeHealthData, duplicatesData] = await Promise.all([
                 getOrganizations(),
-                getOpportunities({ limit: 100, page, sort: 'recent' })
+                getOpportunities({ limit: 100, page, sort: 'recent' }),
+                getScrapeHealth(),
+                getDuplicateGroups()
             ]);
             setOrgs(orgsData);
             setOpps(oppsData.data);
             setTotalPages(oppsData.pagination?.totalPages || 1);
+            setScrapeHealthRows(scrapeHealthData?.data || []);
+            setDuplicateGroups(duplicatesData?.data || []);
+            setDuplicateSelection((prev) => {
+                const next = { ...prev };
+                for (const group of duplicatesData?.data || []) {
+                    if (next[group.groupId]) continue;
+                    next[group.groupId] = {
+                        primaryId: group.recommendedPrimaryId,
+                        selectedIds: group.candidates
+                            .filter(item => item.id !== group.recommendedPrimaryId)
+                            .map(item => item.id)
+                    };
+                }
+                return next;
+            });
         } catch (err) {
             if (err.response?.status === 401) {
                 localStorage.removeItem('token');
@@ -53,6 +77,115 @@ export default function AdminDashboard() {
     const showToast = (msg) => {
         setToast(msg);
         setTimeout(() => setToast(''), 5000);
+    };
+
+    const filteredHealthRows = useMemo(() => {
+        const rows = failedOnly
+            ? scrapeHealthRows.filter(row => row.lastStatus === 'failed' || row.failed7d > 0)
+            : [...scrapeHealthRows];
+
+        const getSortValue = (row) => {
+            switch (healthSortBy) {
+                case 'lastScrape': return row.lastScrapedAt ? new Date(row.lastScrapedAt).getTime() : 0;
+                case 'lastStatus': return row.lastStatus || '';
+                case 'success7d': return row.success7d || 0;
+                case 'failed7d': return row.failed7d || 0;
+                case 'added7d': return row.opportunitiesAdded7d || 0;
+                case 'successRate': return row.successRate || 0;
+                case 'org':
+                default: return (row.organizationName || '').toLowerCase();
+            }
+        };
+
+        rows.sort((a, b) => {
+            const va = getSortValue(a);
+            const vb = getSortValue(b);
+
+            if (typeof va === 'number' && typeof vb === 'number') {
+                return healthSortDir === 'asc' ? va - vb : vb - va;
+            }
+
+            return healthSortDir === 'asc'
+                ? String(va).localeCompare(String(vb))
+                : String(vb).localeCompare(String(va));
+        });
+
+        return rows;
+    }, [scrapeHealthRows, failedOnly, healthSortBy, healthSortDir]);
+
+    const setHealthSort = (field) => {
+        if (healthSortBy === field) {
+            setHealthSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+            return;
+        }
+        setHealthSortBy(field);
+        setHealthSortDir(field === 'org' ? 'asc' : 'desc');
+    };
+
+    const updateDuplicatePrimary = (groupId, nextPrimaryId) => {
+        setDuplicateSelection((prev) => {
+            const current = prev[groupId] || { primaryId: nextPrimaryId, selectedIds: [] };
+            const selected = current.selectedIds.filter(id => id !== nextPrimaryId);
+            return {
+                ...prev,
+                [groupId]: {
+                    primaryId: nextPrimaryId,
+                    selectedIds: selected
+                }
+            };
+        });
+    };
+
+    const toggleDuplicateCandidate = (groupId, candidateId) => {
+        setDuplicateSelection((prev) => {
+            const current = prev[groupId] || { primaryId: '', selectedIds: [] };
+            if (candidateId === current.primaryId) return prev;
+
+            const isSelected = current.selectedIds.includes(candidateId);
+            const nextSelected = isSelected
+                ? current.selectedIds.filter(id => id !== candidateId)
+                : [...current.selectedIds, candidateId];
+
+            return {
+                ...prev,
+                [groupId]: {
+                    ...current,
+                    selectedIds: nextSelected
+                }
+            };
+        });
+    };
+
+    const handleMergeGroup = async (group) => {
+        const selection = duplicateSelection[group.groupId] || {
+            primaryId: group.recommendedPrimaryId,
+            selectedIds: group.candidates
+                .filter(item => item.id !== group.recommendedPrimaryId)
+                .map(item => item.id)
+        };
+
+        if (!selection.primaryId || selection.selectedIds.length === 0) {
+            showToast('Select a primary record and at least one duplicate to merge.');
+            return;
+        }
+
+        if (!confirm(`Merge ${selection.selectedIds.length} duplicate record(s) into selected primary? This cannot be undone.`)) {
+            return;
+        }
+
+        setIsMergingGroup(group.groupId);
+        try {
+            const result = await mergeDuplicates({
+                primaryId: selection.primaryId,
+                duplicateIds: selection.selectedIds
+            });
+            showToast(`Merged ${result.mergedCount} item(s). Kept ${result.keptId}.`);
+            await fetchData();
+        } catch (error) {
+            showToast(error.response?.data?.error || 'Failed to merge duplicates.');
+        } finally {
+            setIsMergingGroup('');
+        }
     };
 
     const getExplicitScrapeUrls = (org) => {
@@ -505,6 +638,151 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <h2 className="font-bold text-slate-800">Scrape Health</h2>
+                        <p className="text-xs text-slate-500 mt-1">7-day reliability snapshot across organizations.</p>
+                    </div>
+                    <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                            type="checkbox"
+                            checked={failedOnly}
+                            onChange={(e) => setFailedOnly(e.target.checked)}
+                            className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                        />
+                        Failed only
+                    </label>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse">
+                        <thead className="bg-slate-50">
+                            <tr>
+                                <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('org')}>Org</th>
+                                <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('lastScrape')}>Last Scrape</th>
+                                <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('lastStatus')}>Last Status</th>
+                                <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('success7d')}>Success 7d</th>
+                                <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('failed7d')}>Failed 7d</th>
+                                <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('added7d')}>Added 7d</th>
+                                <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('successRate')}>Success Rate</th>
+                                <th className="py-3 px-4 font-semibold text-slate-700">Last Error</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredHealthRows.map((row) => (
+                                <tr key={row.organizationId} className="border-t border-slate-100 hover:bg-slate-50">
+                                    <td className="py-3 px-4 font-medium text-slate-800">{row.organizationName}</td>
+                                    <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{row.lastScrapedAt ? new Date(row.lastScrapedAt).toLocaleString() : 'Never'}</td>
+                                    <td className="py-3 px-4">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.lastStatus === 'success' ? 'bg-green-100 text-green-700' : row.lastStatus === 'failed' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                                            {row.lastStatus}
+                                        </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-slate-700">{row.success7d}</td>
+                                    <td className="py-3 px-4 text-slate-700">{row.failed7d}</td>
+                                    <td className="py-3 px-4 text-slate-700">{row.opportunitiesAdded7d}</td>
+                                    <td className="py-3 px-4 text-slate-700">{row.successRate}%</td>
+                                    <td className="py-3 px-4 text-slate-600 max-w-[280px] truncate" title={row.lastError || ''}>{row.lastError || '-'}</td>
+                                </tr>
+                            ))}
+                            {filteredHealthRows.length === 0 && (
+                                <tr>
+                                    <td colSpan="8" className="py-8 text-center text-slate-500">No scrape health rows available for the current filter.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                    <h2 className="font-bold text-slate-800">Duplicate Merge</h2>
+                    <p className="text-xs text-slate-500 mt-1">Review likely duplicates, choose a primary record, and merge safely.</p>
+                </div>
+
+                <div className="p-4 space-y-4">
+                    {duplicateGroups.map((group) => {
+                        const selection = duplicateSelection[group.groupId] || {
+                            primaryId: group.recommendedPrimaryId,
+                            selectedIds: group.candidates.filter(item => item.id !== group.recommendedPrimaryId).map(item => item.id)
+                        };
+
+                        return (
+                            <div key={group.groupId} className="border border-slate-200 rounded-lg overflow-hidden">
+                                <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <div>
+                                        <p className="font-semibold text-slate-800">{group.organizationName}</p>
+                                        <p className="text-xs text-slate-500">{group.candidates.length} candidates in this group</p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleMergeGroup(group)}
+                                        disabled={isMergingGroup === group.groupId}
+                                        className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${isMergingGroup === group.groupId ? 'bg-slate-200 text-slate-500' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                                    >
+                                        {isMergingGroup === group.groupId ? 'Merging...' : 'Merge Selected'}
+                                    </button>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm border-collapse">
+                                        <thead className="bg-white">
+                                            <tr>
+                                                <th className="py-2.5 px-3 font-semibold text-slate-700">Primary</th>
+                                                <th className="py-2.5 px-3 font-semibold text-slate-700">Merge</th>
+                                                <th className="py-2.5 px-3 font-semibold text-slate-700">Title</th>
+                                                <th className="py-2.5 px-3 font-semibold text-slate-700">Org</th>
+                                                <th className="py-2.5 px-3 font-semibold text-slate-700">Deadline</th>
+                                                <th className="py-2.5 px-3 font-semibold text-slate-700">Status</th>
+                                                <th className="py-2.5 px-3 font-semibold text-slate-700">Updated</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {group.candidates.map((candidate) => {
+                                                const isPrimary = selection.primaryId === candidate.id;
+                                                const isSelected = selection.selectedIds.includes(candidate.id);
+                                                return (
+                                                    <tr key={candidate.id} className="border-t border-slate-100 hover:bg-slate-50">
+                                                        <td className="py-2.5 px-3">
+                                                            <input
+                                                                type="radio"
+                                                                name={`primary-${group.groupId}`}
+                                                                checked={isPrimary}
+                                                                onChange={() => updateDuplicatePrimary(group.groupId, candidate.id)}
+                                                            />
+                                                        </td>
+                                                        <td className="py-2.5 px-3">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSelected}
+                                                                disabled={isPrimary}
+                                                                onChange={() => toggleDuplicateCandidate(group.groupId, candidate.id)}
+                                                            />
+                                                        </td>
+                                                        <td className="py-2.5 px-3 max-w-[260px] truncate" title={candidate.title}>{candidate.title}</td>
+                                                        <td className="py-2.5 px-3 text-slate-600">{candidate.organizationName}</td>
+                                                        <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">{candidate.deadline ? new Date(candidate.deadline).toLocaleDateString() : '-'}</td>
+                                                        <td className="py-2.5 px-3 text-slate-600">{candidate.status || '-'}</td>
+                                                        <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">{new Date(candidate.updatedAt).toLocaleString()}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    {duplicateGroups.length === 0 && (
+                        <div className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                            No duplicate groups detected right now.
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Manual Entry Modal */}
