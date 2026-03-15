@@ -60,6 +60,28 @@ function extractRetryAfterSeconds(message = '') {
     return Number.isFinite(value) ? Math.ceil(value) : null;
 }
 
+function buildCandidateUrls(urls) {
+    const normalized = [...new Set(urls.map(url => String(url).trim()).filter(Boolean))];
+    const extraPaths = ['/opportunities', '/events', '/news', '/awards', '/students'];
+    const all = [...normalized];
+
+    for (const base of normalized) {
+        try {
+            const parsed = new URL(base);
+            const path = parsed.pathname.replace(/\/+$/, '') || '/';
+            if (path !== '/') continue;
+
+            for (const extraPath of extraPaths) {
+                all.push(`${parsed.origin}${extraPath}`);
+            }
+        } catch {
+            // Ignore malformed URL; validation happens earlier.
+        }
+    }
+
+    return [...new Set(all)];
+}
+
 async function fetchAndExtractText(url) {
     try {
         const { data } = await axios.get(url, {
@@ -212,7 +234,7 @@ async function scrapeOrganization(organization) {
 
     const configuredUrls = parseOrganizationScrapeUrls(organization);
     const fallbackUrl = organization.officialWebsite ? String(organization.officialWebsite).trim() : '';
-    const candidateUrls = [...configuredUrls, fallbackUrl].filter(Boolean);
+    const candidateUrls = buildCandidateUrls([...configuredUrls, fallbackUrl]);
 
     if (candidateUrls.length === 0) {
         throw new Error(`Organization ${organization.name} has no URL configured to scrape.`);
