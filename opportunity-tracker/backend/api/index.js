@@ -342,7 +342,7 @@ app.get('/api/admin/force-seed', async (req, res) => {
                 }
             });
             addedCount++;
-        } else if (studentOrg.scrapeUrl !== 'https://students.ieee.org/') {
+        } else if (!studentOrg.scrapeUrl) {
             await prisma.organization.update({
                 where: { id: studentOrg.id },
                 data: { scrapeUrl: 'https://students.ieee.org/' }

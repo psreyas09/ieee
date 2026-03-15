@@ -73,63 +73,80 @@ const regions = [
 async function main() {
     console.log('Seeding organizations...');
 
+    const ensureOrganization = async ({ name, type, officialWebsite, scrapeUrl }) => {
+        const existing = await prisma.organization.findFirst({ where: { name } });
+
+        if (!existing) {
+            await prisma.organization.create({
+                data: { name, type, officialWebsite, scrapeUrl }
+            });
+            return;
+        }
+
+        // Non-destructive update: only fill missing fields so admin edits remain intact.
+        const patch = {};
+        if (!existing.type && type) patch.type = type;
+        if (!existing.officialWebsite && officialWebsite) patch.officialWebsite = officialWebsite;
+        if (!existing.scrapeUrl && scrapeUrl) patch.scrapeUrl = scrapeUrl;
+
+        if (Object.keys(patch).length > 0) {
+            await prisma.organization.update({
+                where: { id: existing.id },
+                data: patch
+            });
+        }
+    };
+
     for (const soc of societies) {
-        await prisma.organization.create({
-            data: {
-                name: soc.name,
-                type: 'society',
-                officialWebsite: soc.web,
-            }
+        await ensureOrganization({
+            name: soc.name,
+            type: 'society',
+            officialWebsite: soc.web
         });
     }
 
     for (const council of councils) {
-        await prisma.organization.create({
-            data: {
-                name: council.name,
-                type: 'council',
-                officialWebsite: council.web,
-            }
+        await ensureOrganization({
+            name: council.name,
+            type: 'council',
+            officialWebsite: council.web
         });
     }
 
     for (const region of regions) {
-        await prisma.organization.create({
-            data: {
-                name: region.name,
-                type: 'region',
-                officialWebsite: region.web,
-            }
+        await ensureOrganization({
+            name: region.name,
+            type: 'region',
+            officialWebsite: region.web
         });
     }
 
     // Create Global IEEE Competitions entry
-    await prisma.organization.create({
-        data: {
-            name: 'IEEE Global Student Competitions',
-            type: 'society', // Treat as abstract organization
-            officialWebsite: 'https://www.ieee.org/membership/students/competitions.html',
-        }
+    await ensureOrganization({
+        name: 'IEEE Global Student Competitions',
+        type: 'society',
+        officialWebsite: 'https://www.ieee.org/membership/students/competitions.html'
     });
 
-    await prisma.organization.create({
-        data: {
-            name: 'IEEE Student Activities',
-            type: 'society', // Treat as abstract organization
-            officialWebsite: 'https://students.ieee.org/',
-            scrapeUrl: 'https://students.ieee.org/'
-        }
+    await ensureOrganization({
+        name: 'IEEE Student Activities',
+        type: 'society',
+        officialWebsite: 'https://students.ieee.org/',
+        scrapeUrl: 'https://students.ieee.org/'
     });
 
     console.log('Organizations seeded. Creating logic...');
 
-    const passwordHash = await bcrypt.hash('admin123', 10);
-    await prisma.adminUser.create({
-        data: {
-            username: 'admin',
-            passwordHash
-        }
-    });
+    const existingAdmin = await prisma.adminUser.findUnique({ where: { username: 'admin' } });
+    if (!existingAdmin) {
+        const passwordHash = await bcrypt.hash('admin123', 10);
+        await prisma.adminUser.create({
+            data: {
+                username: 'admin',
+                passwordHash
+            }
+        });
+    }
 
     console.log('Admin user seeded (admin / admin123).');
 }

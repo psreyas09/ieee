@@ -118,8 +118,9 @@ export default function AdminDashboard() {
     };
 
     const handleUpdateScrapeUrl = async (org) => {
-        const currentUrl = org.scrapeUrl || org.officialWebsite || '';
-        const nextUrl = prompt(`Update scrape URL for ${org.name}`, currentUrl);
+        const currentUrl = org.scrapeUrl || '';
+        const actionLabel = org.scrapeUrl ? 'Update' : 'Add';
+        const nextUrl = prompt(`${actionLabel} scrape URL for ${org.name}`, currentUrl);
 
         if (nextUrl === null) return;
 
@@ -244,10 +245,10 @@ export default function AdminDashboard() {
                                         <button
                                             onClick={() => handleUpdateScrapeUrl(org)}
                                             disabled={scrapingId !== null || isScrapingAll}
-                                            className={`p-2 rounded-md ${scrapingId !== null || isScrapingAll ? 'bg-slate-50 text-slate-300' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} transition-colors`}
-                                            title="Edit Scrape URL"
+                                            className={`p-2 rounded-md ${scrapingId !== null || isScrapingAll ? 'bg-slate-50 text-slate-300' : org.scrapeUrl ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'} transition-colors`}
+                                            title={org.scrapeUrl ? 'Edit Scrape URL' : 'Add Scrape URL'}
                                         >
-                                            <Pencil size={16} />
+                                            {org.scrapeUrl ? <Pencil size={16} /> : <PlusCircle size={16} />}
                                         </button>
                                     </div>
                                 </div>
