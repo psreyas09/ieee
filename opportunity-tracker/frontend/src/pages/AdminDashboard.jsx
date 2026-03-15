@@ -225,12 +225,12 @@ export default function AdminDashboard() {
             return;
         }
 
-        const type = prompt('Organization type: society, council, or region', 'society');
+        const type = prompt('Organization type: society, council, region, or other', 'other');
         if (type === null) return;
 
         const cleanedType = type.trim().toLowerCase();
-        if (!['society', 'council', 'region'].includes(cleanedType)) {
-            showToast('Type must be society, council, or region.');
+        if (!['society', 'council', 'region', 'other'].includes(cleanedType)) {
+            showToast('Type must be society, council, region, or other.');
             return;
         }
 

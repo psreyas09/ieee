@@ -597,8 +597,8 @@ app.post('/api/admin/organizations', authenticateAdmin, async (req, res) => {
             return res.status(400).json({ error: 'Organization name is required.' });
         }
 
-        if (!['society', 'council', 'region'].includes(cleanedType)) {
-            return res.status(400).json({ error: 'Organization type must be society, council, or region.' });
+        if (!['society', 'council', 'region', 'other'].includes(cleanedType)) {
+            return res.status(400).json({ error: 'Organization type must be society, council, region, or other.' });
         }
 
         const nextOfficialWebsite = typeof officialWebsite === 'string' ? officialWebsite.trim() : null;
