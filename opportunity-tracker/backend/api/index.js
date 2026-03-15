@@ -141,7 +141,15 @@ app.get('/api/opportunities', async (req, res) => {
         const [opportunities, total] = await Promise.all([
             prisma.opportunity.findMany({
                 where,
-                include: { organization: true },
+                include: {
+                    organization: {
+                        select: {
+                            id: true,
+                            name: true,
+                            type: true
+                        }
+                    }
+                },
                 orderBy: [
                     { deadline: 'asc' },
                     { id: 'asc' }
