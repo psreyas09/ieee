@@ -362,16 +362,16 @@ export default function AdminDashboard() {
                                 {(() => {
                                     const scrapeUrls = getDisplayScrapeUrls(org);
                                     return (
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className="font-semibold text-sm text-slate-800">{org.name}</p>
+                                <div className="flex justify-between items-start gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-semibold text-sm text-slate-800 truncate" title={org.name}>{org.name}</p>
                                         <p className="text-xs text-slate-500 mt-0.5">
                                             Last: {org.lastScrapedAt ? new Date(org.lastScrapedAt).toLocaleString() : 'Never'}
                                         </p>
                                         <div className="mt-2 space-y-1">
                                             {scrapeUrls.length > 0 ? scrapeUrls.map((item) => (
-                                                <div key={item.url} className="flex items-center gap-1.5">
-                                                    <a href={item.url} target="_blank" rel="noopener noreferrer" className={`text-[11px] px-2 py-0.5 rounded-md truncate max-w-[210px] ${item.source === 'explicit' ? 'text-slate-600 bg-slate-100' : 'text-blue-700 bg-blue-50'}`} title={item.url}>
+                                                <div key={item.url} className="flex items-center gap-1.5 min-w-0">
+                                                    <a href={item.url} target="_blank" rel="noopener noreferrer" className={`text-[11px] px-2 py-0.5 rounded-md truncate max-w-[180px] sm:max-w-[210px] ${item.source === 'explicit' ? 'text-slate-600 bg-slate-100' : 'text-blue-700 bg-blue-50'}`} title={item.url}>
                                                         {item.url}
                                                     </a>
                                                     {item.source === 'fallback' ? (
@@ -390,7 +390,7 @@ export default function AdminDashboard() {
                                             )) : <p className="text-[11px] text-amber-700 bg-amber-50 px-2 py-1 rounded-md inline-block">No scrape URLs configured</p>}
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    <div className="flex items-center gap-1.5 flex-shrink-0 self-start">
                                         <button
                                             onClick={() => handleScrape(org.id, org.name)}
                                             disabled={scrapingId !== null || isScrapingAll}
