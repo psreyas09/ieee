@@ -82,10 +82,13 @@ export default function Opportunities() {
 
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="relative col-span-1 md:col-span-4 lg:col-span-1">
+                    <label htmlFor="opportunity-search" className="sr-only">Search opportunities</label>
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Search className="h-5 w-5 text-slate-400" />
                     </div>
                     <input
+                        id="opportunity-search"
+                        name="search"
                         type="text"
                         className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md leading-5 bg-white placeholder-slate-500 focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
                         placeholder="Search keywords..."
@@ -94,7 +97,10 @@ export default function Opportunities() {
                     />
                 </div>
 
+                <label htmlFor="opportunity-organization" className="sr-only">Filter by organization</label>
                 <select
+                    id="opportunity-organization"
+                    name="organizationId"
                     className="block w-full pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
                     value={orgId}
                     onChange={(e) => setOrgId(e.target.value)}
@@ -105,7 +111,10 @@ export default function Opportunities() {
                     ))}
                 </select>
 
+                <label htmlFor="opportunity-type" className="sr-only">Filter by type</label>
                 <select
+                    id="opportunity-type"
+                    name="type"
                     className="block w-full pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
                     value={type}
                     onChange={(e) => setType(e.target.value)}
@@ -114,7 +123,10 @@ export default function Opportunities() {
                     {types.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
 
+                <label htmlFor="opportunity-status" className="sr-only">Filter by status</label>
                 <select
+                    id="opportunity-status"
+                    name="status"
                     className="block w-full pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}

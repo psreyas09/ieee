@@ -521,8 +521,10 @@ export default function AdminDashboard() {
                         <form onSubmit={handleModalSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1 md:col-span-2">
-                                    <label className="text-sm font-semibold text-slate-700">Organization / Society <span className="text-red-500">*</span></label>
+                                    <label htmlFor="manual-org" className="text-sm font-semibold text-slate-700">Organization / Society <span className="text-red-500">*</span></label>
                                     <select
+                                        id="manual-org"
+                                        name="organizationId"
                                         required
                                         className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white"
                                         value={formData.organizationId}
@@ -534,13 +536,13 @@ export default function AdminDashboard() {
                                 </div>
 
                                 <div className="space-y-1 md:col-span-2">
-                                    <label className="text-sm font-semibold text-slate-700">Title <span className="text-red-500">*</span></label>
-                                    <input type="text" required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g. IEEE Global Student Hardware Competition" />
+                                    <label htmlFor="manual-title" className="text-sm font-semibold text-slate-700">Title <span className="text-red-500">*</span></label>
+                                    <input id="manual-title" name="title" type="text" required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g. IEEE Global Student Hardware Competition" />
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-semibold text-slate-700">Type <span className="text-red-500">*</span></label>
-                                    <select required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
+                                    <label htmlFor="manual-type" className="text-sm font-semibold text-slate-700">Type <span className="text-red-500">*</span></label>
+                                    <select id="manual-type" name="type" required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
                                         <option value="Competition">Competition</option>
                                         <option value="Hackathon">Hackathon</option>
                                         <option value="Grant">Grant</option>
@@ -553,8 +555,8 @@ export default function AdminDashboard() {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-semibold text-slate-700">Status <span className="text-red-500">*</span></label>
-                                    <select required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
+                                    <label htmlFor="manual-status" className="text-sm font-semibold text-slate-700">Status <span className="text-red-500">*</span></label>
+                                    <select id="manual-status" name="status" required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
                                         <option value="Live">Live</option>
                                         <option value="Upcoming">Upcoming</option>
                                         <option value="Closed">Closed</option>
@@ -562,22 +564,22 @@ export default function AdminDashboard() {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-semibold text-slate-700">Deadline (Optional)</label>
-                                    <input type="date" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.deadline} onChange={e => setFormData({ ...formData, deadline: e.target.value })} />
+                                    <label htmlFor="manual-deadline" className="text-sm font-semibold text-slate-700">Deadline (Optional)</label>
+                                    <input id="manual-deadline" name="deadline" type="date" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.deadline} onChange={e => setFormData({ ...formData, deadline: e.target.value })} />
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-sm font-semibold text-slate-700">Official Link (Optional)</label>
-                                    <input type="url" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.url} onChange={e => setFormData({ ...formData, url: e.target.value })} placeholder="https://..." />
+                                    <label htmlFor="manual-url" className="text-sm font-semibold text-slate-700">Official Link (Optional)</label>
+                                    <input id="manual-url" name="url" type="url" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.url} onChange={e => setFormData({ ...formData, url: e.target.value })} placeholder="https://..." />
                                 </div>
 
                                 <div className="space-y-1 md:col-span-2">
-                                    <label className="text-sm font-semibold text-slate-700">Description <span className="text-red-500">*</span></label>
-                                    <textarea required rows="3" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the opportunity..."></textarea>
+                                    <label htmlFor="manual-description" className="text-sm font-semibold text-slate-700">Description <span className="text-red-500">*</span></label>
+                                    <textarea id="manual-description" name="description" required rows="3" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the opportunity..."></textarea>
                                 </div>
                                 <div className="space-y-1 md:col-span-2">
-                                    <label className="text-sm font-semibold text-slate-700">Eligibility (Optional)</label>
-                                    <textarea rows="2" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.eligibility} onChange={e => setFormData({ ...formData, eligibility: e.target.value })} placeholder="Who can apply?"></textarea>
+                                    <label htmlFor="manual-eligibility" className="text-sm font-semibold text-slate-700">Eligibility (Optional)</label>
+                                    <textarea id="manual-eligibility" name="eligibility" rows="2" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.eligibility} onChange={e => setFormData({ ...formData, eligibility: e.target.value })} placeholder="Who can apply?"></textarea>
                                 </div>
                             </div>
 

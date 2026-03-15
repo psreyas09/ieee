@@ -39,20 +39,26 @@ export default function AdminLogin() {
 
                 <form onSubmit={handleLogin} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+                        <label htmlFor="admin-username" className="block text-sm font-medium text-slate-700 mb-1">Username</label>
                         <input
+                            id="admin-username"
+                            name="username"
                             type="text"
                             required
+                            autoComplete="username"
                             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-ieee-blue focus:border-ieee-blue outline-none transition-all"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                        <label htmlFor="admin-password" className="block text-sm font-medium text-slate-700 mb-1">Password</label>
                         <input
+                            id="admin-password"
+                            name="password"
                             type="password"
                             required
+                            autoComplete="current-password"
                             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-ieee-blue focus:border-ieee-blue outline-none transition-all"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
