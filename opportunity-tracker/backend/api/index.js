@@ -171,7 +171,7 @@ app.get('/api/organizations', async (req, res) => {
 
 app.get('/api/opportunities', async (req, res) => {
     try {
-        const { organizationId, type, status, search, page = 1, limit = 20 } = req.query;
+        const { organizationId, type, status, search, sort, page = 1, limit = 20 } = req.query;
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
@@ -187,6 +187,17 @@ app.get('/api/opportunities', async (req, res) => {
             ];
         }
 
+        const orderBy = sort === 'recent'
+            ? [
+                { updatedAt: 'desc' },
+                { createdAt: 'desc' },
+                { id: 'desc' }
+            ]
+            : [
+                { deadline: 'asc' },
+                { id: 'asc' }
+            ];
+
         const [opportunities, total] = await Promise.all([
             prisma.opportunity.findMany({
                 where,
@@ -199,10 +210,7 @@ app.get('/api/opportunities', async (req, res) => {
                         }
                     }
                 },
-                orderBy: [
-                    { deadline: 'asc' },
-                    { id: 'asc' }
-                ],
+                orderBy,
                 skip,
                 take: limitNum,
             }),

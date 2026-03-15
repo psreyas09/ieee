@@ -35,7 +35,7 @@ export default function AdminDashboard() {
         try {
             const [orgsData, oppsData] = await Promise.all([
                 getOrganizations(),
-                getOpportunities({ limit: 100, page })
+                getOpportunities({ limit: 100, page, sort: 'recent' })
             ]);
             setOrgs(orgsData);
             setOpps(oppsData.data);
@@ -444,6 +444,7 @@ export default function AdminDashboard() {
                             <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                                 <tr>
                                     <th className="py-3 px-4 font-semibold text-slate-700">Title</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700">Organization</th>
                                     <th className="py-3 px-4 font-semibold text-slate-700">Type</th>
                                     <th className="py-3 px-4 font-semibold text-slate-700">Status</th>
                                     <th className="py-3 px-4 font-semibold text-slate-700">Actions</th>
@@ -455,6 +456,7 @@ export default function AdminDashboard() {
                                         <td className="py-3 px-4 max-w-xs block truncate" title={opp.title}>
                                             <span className="font-medium text-slate-800">{opp.title}</span>
                                         </td>
+                                        <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{opp.organization?.name || 'Unknown'}</td>
                                         <td className="py-3 px-4 text-slate-600">{opp.type}</td>
                                         <td className="py-3 px-4">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${opp.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
@@ -477,7 +479,7 @@ export default function AdminDashboard() {
                                 ))}
                                 {opps.length === 0 && (
                                     <tr>
-                                        <td colSpan="4" className="text-center py-8 text-slate-500">No opportunities found.</td>
+                                        <td colSpan="5" className="text-center py-8 text-slate-500">No opportunities found.</td>
                                     </tr>
                                 )}
                             </tbody>
