@@ -55,11 +55,25 @@ export default function AdminDashboard() {
         setTimeout(() => setToast(''), 5000);
     };
 
-    const getScrapeUrls = (org) => {
+    const getExplicitScrapeUrls = (org) => {
         if (Array.isArray(org.scrapeUrls) && org.scrapeUrls.length > 0) {
             return org.scrapeUrls;
         }
         return org.scrapeUrl ? [org.scrapeUrl] : [];
+    };
+
+    const getDisplayScrapeUrls = (org) => {
+        const explicit = getExplicitScrapeUrls(org);
+        const fallback = typeof org.officialWebsite === 'string' ? org.officialWebsite.trim() : '';
+
+        if (!fallback || explicit.includes(fallback)) {
+            return explicit.map((url) => ({ url, source: 'explicit' }));
+        }
+
+        return [
+            ...explicit.map((url) => ({ url, source: 'explicit' })),
+            { url: fallback, source: 'fallback' }
+        ];
     };
 
     const isValidHttpUrl = (value) => {
@@ -134,7 +148,7 @@ export default function AdminDashboard() {
     };
 
     const handleManageScrapeUrls = async (org) => {
-        const currentUrls = getScrapeUrls(org);
+        const currentUrls = getExplicitScrapeUrls(org);
         const nextValue = prompt(
             `Manage scrape URLs for ${org.name}. Enter one URL per line. Remove a line to delete it.`,
             currentUrls.join('\n')
@@ -346,7 +360,7 @@ export default function AdminDashboard() {
                         {orgs.map(org => (
                             <div key={org.id} className="border border-slate-200 rounded-lg p-3 hover:border-ieee-blue/30 transition-colors">
                                 {(() => {
-                                    const scrapeUrls = getScrapeUrls(org);
+                                    const scrapeUrls = getDisplayScrapeUrls(org);
                                     return (
                                 <div className="flex justify-between items-center">
                                     <div>
@@ -355,19 +369,23 @@ export default function AdminDashboard() {
                                             Last: {org.lastScrapedAt ? new Date(org.lastScrapedAt).toLocaleString() : 'Never'}
                                         </p>
                                         <div className="mt-2 space-y-1">
-                                            {scrapeUrls.length > 0 ? scrapeUrls.map((url) => (
-                                                <div key={url} className="flex items-center gap-1.5">
-                                                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md truncate max-w-[210px]" title={url}>
-                                                        {url}
+                                            {scrapeUrls.length > 0 ? scrapeUrls.map((item) => (
+                                                <div key={item.url} className="flex items-center gap-1.5">
+                                                    <a href={item.url} target="_blank" rel="noopener noreferrer" className={`text-[11px] px-2 py-0.5 rounded-md truncate max-w-[210px] ${item.source === 'explicit' ? 'text-slate-600 bg-slate-100' : 'text-blue-700 bg-blue-50'}`} title={item.url}>
+                                                        {item.url}
                                                     </a>
-                                                    <button
-                                                        onClick={() => handleDeleteScrapeUrl(org, url)}
-                                                        disabled={scrapingId !== null || isScrapingAll}
-                                                        className={`p-1 rounded ${scrapingId !== null || isScrapingAll ? 'text-slate-300' : 'text-red-500 hover:bg-red-50'} transition-colors`}
-                                                        title="Delete this scrape URL"
-                                                    >
-                                                        <X size={12} />
-                                                    </button>
+                                                    {item.source === 'fallback' ? (
+                                                        <span className="text-[10px] text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">fallback</span>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleDeleteScrapeUrl(org, item.url)}
+                                                            disabled={scrapingId !== null || isScrapingAll}
+                                                            className={`p-1 rounded ${scrapingId !== null || isScrapingAll ? 'text-slate-300' : 'text-red-500 hover:bg-red-50'} transition-colors`}
+                                                            title="Delete this scrape URL"
+                                                        >
+                                                            <X size={12} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )) : <p className="text-[11px] text-amber-700 bg-amber-50 px-2 py-1 rounded-md inline-block">No scrape URLs configured</p>}
                                         </div>
