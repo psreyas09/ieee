@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Filter } from 'lucide-react';
 import { getOpportunities, getOrganizations } from '../services/api';
 import OpportunityCard from '../components/OpportunityCard';
@@ -10,6 +10,7 @@ export default function Opportunities() {
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
+    const firstLoadRef = useRef(true);
 
     // Filters
     const [search, setSearch] = useState('');
@@ -49,10 +50,16 @@ export default function Opportunities() {
     }, []);
 
     useEffect(() => {
-        // Debounce search
+        if (firstLoadRef.current) {
+            firstLoadRef.current = false;
+            fetchOpps(1, false);
+            return;
+        }
+
+        // Debounce only subsequent filter/search edits.
         const delay = setTimeout(() => {
             fetchOpps(1, false);
-        }, 500);
+        }, 350);
         return () => clearTimeout(delay);
     }, [search, orgId, type, status]);
 
