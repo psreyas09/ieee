@@ -40,20 +40,36 @@ export default function AdminDashboard() {
 
     const fetchData = async () => {
         try {
-            const [orgsData, oppsData, scrapeHealthData, duplicatesData] = await Promise.all([
+            const [orgsResult, oppsResult, scrapeHealthResult, duplicatesResult] = await Promise.allSettled([
                 getOrganizations(),
                 getOpportunities({ limit: 100, page, sort: 'recent' }),
                 getScrapeHealth(),
                 getDuplicateGroups()
             ]);
-            setOrgs(orgsData);
-            setOpps(oppsData.data);
-            setTotalPages(oppsData.pagination?.totalPages || 1);
-            setScrapeHealthRows(scrapeHealthData?.data || []);
-            setDuplicateGroups(duplicatesData?.data || []);
+
+            if (orgsResult.status === 'fulfilled') {
+                setOrgs(orgsResult.value || []);
+            }
+
+            if (oppsResult.status === 'fulfilled') {
+                setOpps(oppsResult.value?.data || []);
+                setTotalPages(oppsResult.value?.pagination?.totalPages || 1);
+            }
+
+            if (scrapeHealthResult.status === 'fulfilled') {
+                setScrapeHealthRows(scrapeHealthResult.value?.data || []);
+            } else {
+                setScrapeHealthRows([]);
+            }
+
+            const nextDuplicateGroups = duplicatesResult.status === 'fulfilled'
+                ? (duplicatesResult.value?.data || [])
+                : [];
+
+            setDuplicateGroups(nextDuplicateGroups);
             setDuplicateSelection((prev) => {
                 const next = { ...prev };
-                for (const group of duplicatesData?.data || []) {
+                for (const group of nextDuplicateGroups) {
                     if (next[group.groupId]) continue;
                     next[group.groupId] = {
                         primaryId: group.recommendedPrimaryId,
@@ -64,6 +80,23 @@ export default function AdminDashboard() {
                 }
                 return next;
             });
+
+            const rejected = [orgsResult, oppsResult, scrapeHealthResult, duplicatesResult]
+                .filter(result => result.status === 'rejected')
+                .map(result => result.reason)
+                .filter(Boolean);
+
+            const unauthorized = rejected.some((error) => error?.response?.status === 401);
+            if (unauthorized) {
+                localStorage.removeItem('token');
+                navigate('/admin/login');
+                return;
+            }
+
+            if (rejected.length > 0) {
+                const firstMessage = rejected[0]?.response?.data?.error || rejected[0]?.message || 'Some dashboard sections failed to load.';
+                showToast(`Partial load: ${firstMessage}`);
+            }
         } catch (err) {
             if (err.response?.status === 401) {
                 localStorage.removeItem('token');
