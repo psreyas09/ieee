@@ -175,6 +175,70 @@ const getNormalizedOpportunityUrl = (value) => {
     return isValidHttpUrl(cleaned) ? cleaned : null;
 };
 
+const opportunityUrlHealthCache = new Map();
+const OPPORTUNITY_URL_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+const checkUrlWithTimeout = async (url, method, timeoutMs) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await fetch(url, {
+            method,
+            redirect: 'follow',
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; IEEE-Opportunity-Tracker/1.0)'
+            }
+        });
+    } finally {
+        clearTimeout(timeout);
+    }
+};
+
+const isUrlHardDead = async (url) => {
+    const now = Date.now();
+    const cached = opportunityUrlHealthCache.get(url);
+    if (cached && (now - cached.checkedAt) < OPPORTUNITY_URL_CACHE_TTL_MS) {
+        return cached.hardDead;
+    }
+
+    try {
+        const headResponse = await checkUrlWithTimeout(url, 'HEAD', 4500);
+        if (headResponse.status === 404 || headResponse.status === 410) {
+            opportunityUrlHealthCache.set(url, { hardDead: true, checkedAt: now });
+            return true;
+        }
+
+        if (headResponse.status >= 200 && headResponse.status < 400) {
+            opportunityUrlHealthCache.set(url, { hardDead: false, checkedAt: now });
+            return false;
+        }
+
+        if (headResponse.status === 405) {
+            const getResponse = await checkUrlWithTimeout(url, 'GET', 5000);
+            const hardDead = getResponse.status === 404 || getResponse.status === 410;
+            opportunityUrlHealthCache.set(url, { hardDead, checkedAt: now });
+            return hardDead;
+        }
+
+        // Keep link for non-404 statuses (403/429/5xx) to avoid dropping valid pages.
+        opportunityUrlHealthCache.set(url, { hardDead: false, checkedAt: now });
+        return false;
+    } catch {
+        // Network/transient failure should not erase potentially valid links.
+        opportunityUrlHealthCache.set(url, { hardDead: false, checkedAt: now });
+        return false;
+    }
+};
+
+const getValidatedOpportunityUrl = async (value) => {
+    const normalized = getNormalizedOpportunityUrl(value);
+    if (!normalized) return null;
+    const hardDead = await isUrlHardDead(normalized);
+    return hardDead ? null : normalized;
+};
+
 const processScrapedOpportunities = async (organization, opportunities) => {
     let addedCount = 0;
 
@@ -183,6 +247,8 @@ const processScrapedOpportunities = async (organization, opportunities) => {
     });
 
     for (const opp of opportunities) {
+        const candidateUrl = await getValidatedOpportunityUrl(opp.url);
+
         let existing = null;
         for (const record of allExistingForOrg) {
             if (calculateSimilarity(opp.title, record.title) > SCRAPE_MATCH_THRESHOLD) {
@@ -199,7 +265,7 @@ const processScrapedOpportunities = async (organization, opportunities) => {
                     description: opp.description || '',
                     deadline: parsedDate,
                     eligibility: opp.eligibility,
-                    url: getNormalizedOpportunityUrl(opp.url),
+                    url: candidateUrl,
                     type: opp.type || 'Other',
                     status: finalStatus,
                     source: 'auto',
@@ -219,7 +285,7 @@ const processScrapedOpportunities = async (organization, opportunities) => {
                 lastFetchedAt: new Date(),
                 deadline: parsedDate || existing.deadline,
                 status: finalStatus,
-                url: getNormalizedOpportunityUrl(opp.url) || existing.url
+                url: candidateUrl || existing.url
             }
         });
     }
