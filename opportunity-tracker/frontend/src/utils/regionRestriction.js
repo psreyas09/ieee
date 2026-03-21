@@ -29,7 +29,10 @@ const REGION_ELIGIBILITY_PHRASES = [
 ];
 
 export function getRegionRestriction(opportunity) {
-    const text = `${opportunity?.title || ''} ${opportunity?.description || ''} ${opportunity?.eligibility || ''}`.trim();
+    const titleText = opportunity?.title || '';
+    const descriptionText = opportunity?.description || '';
+    const eligibilityText = opportunity?.eligibility || '';
+    const text = `${titleText} ${descriptionText} ${eligibilityText}`.trim();
     if (!text) return { isRestricted: false, label: '' };
 
     const hasRestrictionSignal = RESTRICTION_TRIGGERS.some((regex) => regex.test(text));
@@ -43,6 +46,12 @@ export function getRegionRestriction(opportunity) {
                 return { isRestricted: true, label: hint.label };
             }
         }
+    }
+
+    const eligibilityGeoMatch = eligibilityText.match(/\b(?:members?|professionals?|students?|residents?|citizens?|applicants?)\b[^.]{0,100}\b(?:in|from|of)\s+([A-Z][A-Za-z]+(?:[\s-][A-Z][A-Za-z]+){0,2})\b/);
+    if (eligibilityGeoMatch?.[1]) {
+        const place = eligibilityGeoMatch[1].trim();
+        return { isRestricted: true, label: `${place} Only` };
     }
 
     // Avoid false positives from generic eligibility text unless a specific region is detected.
