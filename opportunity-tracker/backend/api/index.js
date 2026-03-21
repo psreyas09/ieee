@@ -282,7 +282,14 @@ const getValidatedOrganizationFallbackUrl = async (value) => {
 
 const processScrapedOpportunities = async (organization, opportunities) => {
     let addedCount = 0;
-    const organizationFallbackUrl = await getValidatedOrganizationFallbackUrl(organization?.officialWebsite);
+    const scrapeUrls = parseScrapeUrls(organization?.scrapeUrl);
+    const primaryFallbackCandidate = organization?.officialWebsite || null;
+    const secondaryFallbackCandidate = scrapeUrls[0] || null;
+
+    let organizationFallbackUrl = await getValidatedOrganizationFallbackUrl(primaryFallbackCandidate);
+    if (!organizationFallbackUrl && secondaryFallbackCandidate) {
+        organizationFallbackUrl = await getValidatedOrganizationFallbackUrl(secondaryFallbackCandidate);
+    }
 
     const allExistingForOrg = await prisma.opportunity.findMany({
         where: { organizationId: organization.id, status: { not: 'Closed' } }
