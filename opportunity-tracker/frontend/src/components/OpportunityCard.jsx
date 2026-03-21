@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Clock, Bookmark, Building, ChevronRight } from 'lucide-react';
+import { getRegionRestriction } from '../utils/regionRestriction';
 
 export default function OpportunityCard({ opportunity, onSaveToggle }) {
     const [saved, setSaved] = useState(false);
@@ -33,6 +34,7 @@ export default function OpportunityCard({ opportunity, onSaveToggle }) {
     };
 
     const daysLeft = getDaysLeft(opportunity.deadline);
+    const regionRestriction = getRegionRestriction(opportunity);
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -62,6 +64,14 @@ export default function OpportunityCard({ opportunity, onSaveToggle }) {
                         <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                             {opportunity.type}
                         </span>
+                        {regionRestriction.isRestricted && (
+                            <span
+                                className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200"
+                                title={regionRestriction.label}
+                            >
+                                {regionRestriction.label.toUpperCase()}
+                            </span>
+                        )}
                     </div>
                     <button
                         onClick={handleSave}

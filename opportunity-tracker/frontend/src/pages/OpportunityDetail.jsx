@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getOpportunity } from '../services/api';
 import { ArrowLeft, Calendar, Building, Globe, CheckCircle } from 'lucide-react';
+import { getRegionRestriction } from '../utils/regionRestriction';
 
 export default function OpportunityDetail() {
     const { id } = useParams();
@@ -18,6 +19,8 @@ export default function OpportunityDetail() {
 
     if (loading) return <div className="py-20 text-center animate-pulse text-slate-500">Loading details...</div>;
     if (error || !opp) return <div className="py-20 text-center text-red-500">{error}</div>;
+
+    const regionRestriction = getRegionRestriction(opp);
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
@@ -37,6 +40,11 @@ export default function OpportunityDetail() {
                         {opp.verified && (
                             <span className="flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                                 <CheckCircle size={14} className="text-blue-500" /> Verified
+                            </span>
+                        )}
+                        {regionRestriction.isRestricted && (
+                            <span className="text-sm font-semibold px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200" title={regionRestriction.label}>
+                                {regionRestriction.label}
                             </span>
                         )}
                     </div>
