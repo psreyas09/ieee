@@ -224,23 +224,36 @@ async function fetchAndExtractText(url) {
 }
 
 async function fetchPage(url) {
-    const { data } = await axios.get(url, {
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1'
-        },
-        httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-        timeout: 10000
-    });
-    return String(data || '');
+    try {
+        const { data } = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1'
+            },
+            httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+            timeout: 10000
+        });
+        return String(data || '');
+    } catch (error) {
+        if (error.response?.status === 403) {
+            throw new Error('403_FORBIDDEN');
+        }
+        if (error.response?.status === 404) {
+            throw new Error('404_NOT_FOUND');
+        }
+        if (error.code === 'ECONNABORTED') {
+            throw new Error('TIMEOUT');
+        }
+        throw new Error(error.message || 'FETCH_FAILED');
+    }
 }
 
 function extractVisibleTextAndLinks(rawHtml, pageUrl) {
@@ -301,6 +314,7 @@ async function crawlRelevantContent(seedUrls) {
     const queue = normalizedSeeds.map((url) => ({ url, depth: 0, base: url }));
     const textParts = [];
     const crawlErrors = [];
+    const blockedBy403 = [];
     let textLength = 0;
 
     while (queue.length > 0 && visited.size < SAFE_CRAWL_MAX_PAGES && textLength < SAFE_CRAWL_TOTAL_TEXT_CAP) {
@@ -342,12 +356,19 @@ async function crawlRelevantContent(seedUrls) {
                 queue.push({ url: nextUrl, depth: current.depth + 1, base: current.base });
             }
         } catch (error) {
+            if (error.message === '403_FORBIDDEN') {
+                blockedBy403.push(current.url);
+            }
             crawlErrors.push(`${current.url} -> ${error.message}`);
             console.warn(`Crawl skip for ${current.url}: ${error.message}`);
         }
     }
 
     if (textParts.length === 0) {
+        if (blockedBy403.length > 0 && blockedBy403.length === visited.size) {
+            throw new Error('Target website blocked the scraper on all attempted subsection URLs (403 anti-bot protection). Add a direct public content URL in admin scrape URLs or use manual entry.');
+        }
+
         throw new Error(`Failed to extract readable content from seed/subsection crawl. Attempts: ${crawlErrors.join(' | ')}`);
     }
 
