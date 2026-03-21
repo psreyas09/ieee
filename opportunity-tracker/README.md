@@ -72,6 +72,7 @@ Merge behavior:
 This repository uses a monorepo structure configured for automated Vercel deployments.
 - `/frontend` - Contains the React app
 - `/backend` - Contains the Express APIs and Prisma bindings
+- `/HANDOVER.md` - Quick continuity and troubleshooting guide for future chats/sessions
 
 ## Environment Variables Configuration
 

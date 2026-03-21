@@ -2,6 +2,8 @@
 
 This document summarizes the current architecture, data flow, admin operations, and production runbook.
 
+For quick continuity between chats/sessions, see `HANDOVER.md` in the repository root.
+
 ## Overview
 
 IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student opportunities (competitions, grants, hackathons, paper contests, workshops, and related events) into one searchable feed.
