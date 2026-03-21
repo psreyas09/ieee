@@ -175,6 +175,39 @@ const getNormalizedOpportunityUrl = (value) => {
     return isValidHttpUrl(cleaned) ? cleaned : null;
 };
 
+const GENERIC_LISTING_PATHS = new Set([
+    '/',
+    '/awards',
+    '/award',
+    '/events',
+    '/event',
+    '/news',
+    '/students',
+    '/student',
+    '/opportunities',
+    '/opportunity',
+    '/webinars',
+    '/webinar',
+    '/conferences',
+    '/conference'
+]);
+
+const isGenericListingUrl = (urlValue) => {
+    try {
+        const parsed = new URL(urlValue);
+        const normalizedPath = (parsed.pathname || '/').replace(/\/+$/, '') || '/';
+
+        // Treat section roots as non-specific links; keep deeper pages as candidates.
+        if (GENERIC_LISTING_PATHS.has(normalizedPath.toLowerCase())) {
+            return true;
+        }
+
+        return false;
+    } catch {
+        return true;
+    }
+};
+
 const opportunityUrlHealthCache = new Map();
 const OPPORTUNITY_URL_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -235,6 +268,7 @@ const isUrlHardDead = async (url) => {
 const getValidatedOpportunityUrl = async (value) => {
     const normalized = getNormalizedOpportunityUrl(value);
     if (!normalized) return null;
+    if (isGenericListingUrl(normalized)) return null;
     const hardDead = await isUrlHardDead(normalized);
     return hardDead ? null : normalized;
 };
