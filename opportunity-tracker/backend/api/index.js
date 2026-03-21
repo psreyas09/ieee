@@ -273,8 +273,16 @@ const getValidatedOpportunityUrl = async (value) => {
     return hardDead ? null : normalized;
 };
 
+const getValidatedOrganizationFallbackUrl = async (value) => {
+    const normalized = getNormalizedOpportunityUrl(value);
+    if (!normalized) return null;
+    const hardDead = await isUrlHardDead(normalized);
+    return hardDead ? null : normalized;
+};
+
 const processScrapedOpportunities = async (organization, opportunities) => {
     let addedCount = 0;
+    const organizationFallbackUrl = await getValidatedOrganizationFallbackUrl(organization?.officialWebsite);
 
     const allExistingForOrg = await prisma.opportunity.findMany({
         where: { organizationId: organization.id, status: { not: 'Closed' } }
@@ -299,7 +307,7 @@ const processScrapedOpportunities = async (organization, opportunities) => {
                     description: opp.description || '',
                     deadline: parsedDate,
                     eligibility: opp.eligibility,
-                    url: candidateUrl,
+                    url: candidateUrl || organizationFallbackUrl,
                     type: opp.type || 'Other',
                     status: finalStatus,
                     source: 'auto',
@@ -319,7 +327,7 @@ const processScrapedOpportunities = async (organization, opportunities) => {
                 lastFetchedAt: new Date(),
                 deadline: parsedDate || existing.deadline,
                 status: finalStatus,
-                url: candidateUrl || existing.url
+                url: candidateUrl || existing.url || organizationFallbackUrl
             }
         });
     }
