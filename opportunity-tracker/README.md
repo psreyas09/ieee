@@ -8,6 +8,14 @@ A full-stack web application designed for IEEE student members to discover compe
 - AI Scraping: Cheerio API & Google Gemini 2.5 Flash
 
 ## Recent Feature Updates
+- Scraper now supports **safe bounded subsection crawling** to improve opportunity discovery:
+   - same-domain internal links only
+   - configurable hard limits on pages/depth/links/text budget
+   - keyword-based subsection prioritization for opportunity-relevant pages
+   - blocked file types skipped (`pdf`, media, archives, office files)
+- Closing Soon counts were aligned between dashboard cards, feed labels, and stats API:
+   - uses day-boundary 7-day window (start of today through end of day +7)
+   - dashboard urgent section now evaluates a broader live dataset before selecting display cards
 - Phase 1 Admin Intelligence shipped:
    - Scrape Health dashboard metrics per organization (last status, failures, 7-day success/fail/add counts, success rate)
    - Duplicate Merge tool with grouped candidate detection and safe merge into a selected primary record
@@ -110,6 +118,11 @@ When deploying to Vercel, **you do not use `.env` files.** Instead, you must add
    - \`ADMIN_USERNAME\`
    - \`ADMIN_PASSWORD_HASH\`
    - \`CRON_SECRET\` (Required for authenticated Vercel cron calls)
+   - `SCRAPER_MAX_PAGES` (optional, defaults to 8)
+   - `SCRAPER_MAX_DEPTH` (optional, defaults to 1)
+   - `SCRAPER_MAX_LINKS_PER_PAGE` (optional, defaults to 10)
+   - `SCRAPER_MAX_TEXT_PER_PAGE` (optional, defaults to 3000)
+   - `SCRAPER_TOTAL_TEXT_CAP` (optional, defaults to 12000)
 3. **Important for Frontend:** Add the following key to let the React app know where the API is hosted in production:
    - \`VITE_API_URL\` = \`/api\`  *(Since Vercel serves the API on the same domain as the frontend, a relative path is required).*
 
@@ -201,3 +214,9 @@ npx prisma migrate deploy
 ```
 
 Then redeploy/restart backend.
+
+### If closing-soon cards and count look different
+Latest logic is aligned to a day-based 7-day window. If mismatch persists in production:
+1. Ensure the latest `main` deployment is live.
+2. Hard refresh browser cache.
+3. Confirm backend and frontend are from the same release.

@@ -31,11 +31,16 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 
 ### Ingestion flow
 1. Choose target URLs: all explicit `scrapeUrls` (or parsed `scrapeUrl`) first, then `officialWebsite` fallback.
-2. Fetch HTML with browser-like headers.
-3. Remove non-content tags and extract body text.
-4. Limit extracted content length for model safety.
-5. Prompt Gemini for strict JSON output.
-6. Parse and upsert opportunities.
+2. Perform safe bounded subsection crawl:
+	 - same-domain links only
+	 - keyword-prioritized internal links
+	 - hard limits for depth/pages/links/text budget
+	 - skip non-HTML/document/media file extensions
+3. Fetch HTML with browser-like headers.
+4. Remove non-content tags and extract body text.
+5. Limit extracted content length for model safety.
+6. Prompt Gemini for strict JSON output.
+7. Parse and upsert opportunities.
 
 ### Model strategy
 - Primary: `gemini-2.5-flash-lite`
@@ -89,6 +94,8 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 9. Production hardening:
 	 - scrape health endpoint no longer hard-fails if `ScrapeRunLog` migration is pending; returns fallback payload with warning
 	 - admin dashboard uses partial-load fetch strategy so one failing section does not blank the full page
+10. Count consistency fix:
+	 - closing-soon stats API and dashboard urgent list now share day-boundary 7-day logic to reduce count/card mismatch
 
 ## API Surface (Key Endpoints)
 
@@ -124,6 +131,11 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - `GEMINI_API_KEY`
 - `GEMINI_API_KEY_2` (optional)
 - `GEMINI_API_KEYS` (optional CSV for multi-key rotation)
+- `SCRAPER_MAX_PAGES` (optional; default `8`)
+- `SCRAPER_MAX_DEPTH` (optional; default `1`)
+- `SCRAPER_MAX_LINKS_PER_PAGE` (optional; default `10`)
+- `SCRAPER_MAX_TEXT_PER_PAGE` (optional; default `3000`)
+- `SCRAPER_TOTAL_TEXT_CAP` (optional; default `12000`)
 - `JWT_SECRET`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD_HASH`
