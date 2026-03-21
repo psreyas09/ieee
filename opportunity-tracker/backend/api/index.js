@@ -366,15 +366,16 @@ app.get('/api/stats', async (req, res) => {
             where: { status: 'Live' }
         });
 
-        // Approximation for 'closing this week' (next 7 days)
-        const nextWeek = new Date();
-        nextWeek.setDate(nextWeek.getDate() + 7);
+        // Use day boundaries for consistency with card-level "Closing Soon" labels.
+        const today = new Date();
+        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+        const endOfWindow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7, 23, 59, 59, 999);
         const closingSoon = await prisma.opportunity.count({
             where: {
                 status: 'Live',
                 deadline: {
-                    lte: nextWeek,
-                    gte: new Date(),
+                    lte: endOfWindow,
+                    gte: startOfToday,
                 }
             }
         });

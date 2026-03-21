@@ -16,18 +16,22 @@ export default function Dashboard() {
             try {
                 const [statsData, urgentData] = await Promise.all([
                     getStats(),
-                    getOpportunities({ status: 'Live', limit: 4 }) // Simplifying urgent fetch for now
+                    getOpportunities({ status: 'Live', limit: 100 })
                 ]);
                 setStats(statsData);
-                // Filter locally for closing within 7 days if API didn't perfectly handle
+
+                const now = new Date();
+                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+                const endOfWindow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59, 59, 999);
+
+                // Filter locally using day boundaries to match backend stats.
                 const filteredUrgent = urgentData.data.filter(opp => {
                     if (!opp.deadline) return false;
-                    const days = (new Date(opp.deadline) - new Date()) / (1000 * 60 * 60 * 24);
-                    return days >= 0 && days <= 7;
+                    const deadline = new Date(opp.deadline);
+                    return deadline >= startOfToday && deadline <= endOfWindow;
                 });
 
-                // If not enough urgent, just show soonest
-                setUrgent(filteredUrgent.length > 0 ? filteredUrgent : urgentData.data);
+                setUrgent(filteredUrgent.slice(0, 9));
             } catch (err) {
                 console.error(err);
             } finally {
