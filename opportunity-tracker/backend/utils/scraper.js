@@ -21,6 +21,22 @@ const geminiApiKeys = getGeminiApiKeys();
 const geminiClients = geminiApiKeys.map(apiKey => new GoogleGenAI({ apiKey }));
 let nextGeminiClientIndex = 0;
 
+const SAFE_CRAWL_MAX_PAGES = Number(process.env.SCRAPER_MAX_PAGES || 8);
+const SAFE_CRAWL_MAX_DEPTH = Number(process.env.SCRAPER_MAX_DEPTH || 1);
+const SAFE_CRAWL_MAX_LINKS_PER_PAGE = Number(process.env.SCRAPER_MAX_LINKS_PER_PAGE || 10);
+const SAFE_CRAWL_MAX_TEXT_PER_PAGE = Number(process.env.SCRAPER_MAX_TEXT_PER_PAGE || 3000);
+const SAFE_CRAWL_TOTAL_TEXT_CAP = Number(process.env.SCRAPER_TOTAL_TEXT_CAP || 12000);
+
+const SKIP_FILE_EXTENSIONS = new Set([
+    '.pdf', '.zip', '.rar', '.7z', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx',
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.mp4', '.mp3', '.avi', '.mov'
+]);
+
+const HIGH_SIGNAL_KEYWORDS = [
+    'opportun', 'award', 'grant', 'scholarship', 'fellowship', 'competition', 'contest',
+    'paper', 'call-for-papers', 'cfp', 'hackathon', 'students', 'student', 'events', 'conference'
+];
+
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 function parseOrganizationScrapeUrls(organization) {
@@ -80,6 +96,58 @@ function buildCandidateUrls(urls) {
     }
 
     return [...new Set(all)];
+}
+
+function normalizeUrl(value) {
+    try {
+        const parsed = new URL(String(value).trim());
+        parsed.hash = '';
+        const cleanedPath = parsed.pathname.replace(/\/+$/, '');
+        parsed.pathname = cleanedPath || '/';
+        return parsed.toString();
+    } catch {
+        return null;
+    }
+}
+
+function hasBlockedExtension(urlString) {
+    try {
+        const parsed = new URL(urlString);
+        const path = parsed.pathname.toLowerCase();
+        for (const ext of SKIP_FILE_EXTENSIONS) {
+            if (path.endsWith(ext)) return true;
+        }
+    } catch {
+        return true;
+    }
+    return false;
+}
+
+function isSameDomainUrl(baseUrl, candidateUrl) {
+    try {
+        const base = new URL(baseUrl);
+        const candidate = new URL(candidateUrl);
+        return base.hostname === candidate.hostname;
+    } catch {
+        return false;
+    }
+}
+
+function scoreLink(urlString) {
+    const target = String(urlString).toLowerCase();
+    let score = 0;
+
+    for (const token of HIGH_SIGNAL_KEYWORDS) {
+        if (target.includes(token)) score += 3;
+    }
+
+    if (target.includes('/news')) score += 1;
+    if (target.includes('/blog')) score -= 1;
+    if (target.includes('/contact')) score -= 2;
+    if (target.includes('/about')) score -= 1;
+    if (target.includes('/privacy')) score -= 3;
+
+    return score;
 }
 
 async function fetchAndExtractText(url) {
@@ -153,6 +221,141 @@ async function fetchAndExtractText(url) {
         }
         throw new Error(`Failed to fetch URL: ${error.message}`);
     }
+}
+
+async function fetchPage(url) {
+    const { data } = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1'
+        },
+        httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+        timeout: 10000
+    });
+    return String(data || '');
+}
+
+function extractVisibleTextAndLinks(rawHtml, pageUrl) {
+    const $ = cheerio.load(rawHtml);
+
+    $('script, style, nav, footer, header, iframe, noscript').remove();
+    let text = $('body').text().replace(/\s+/g, ' ').trim();
+
+    if (text.length < 120) {
+        const metaPieces = [
+            $('title').text(),
+            $('meta[name="description"]').attr('content'),
+            $('meta[property="og:title"]').attr('content'),
+            $('meta[property="og:description"]').attr('content')
+        ].filter(Boolean);
+
+        const linkText = $('a')
+            .map((_, el) => $(el).text().trim())
+            .get()
+            .filter(Boolean)
+            .slice(0, 200)
+            .join(' ');
+
+        const fallbackText = `${metaPieces.join(' ')} ${linkText}`.replace(/\s+/g, ' ').trim();
+        if (fallbackText.length > text.length) {
+            text = fallbackText;
+        }
+    }
+
+    const links = $('a[href]')
+        .map((_, el) => $(el).attr('href'))
+        .get()
+        .map((href) => {
+            try {
+                return new URL(String(href).trim(), pageUrl).toString();
+            } catch {
+                return null;
+            }
+        })
+        .filter(Boolean);
+
+    return { text, links };
+}
+
+async function crawlRelevantContent(seedUrls) {
+    const normalizedSeeds = [...new Set(
+        seedUrls
+            .map(normalizeUrl)
+            .filter(Boolean)
+            .filter(url => !hasBlockedExtension(url))
+    )];
+
+    if (normalizedSeeds.length === 0) {
+        throw new Error('No valid seed URLs available for crawling.');
+    }
+
+    const visited = new Set();
+    const queue = normalizedSeeds.map((url) => ({ url, depth: 0, base: url }));
+    const textParts = [];
+    const crawlErrors = [];
+    let textLength = 0;
+
+    while (queue.length > 0 && visited.size < SAFE_CRAWL_MAX_PAGES && textLength < SAFE_CRAWL_TOTAL_TEXT_CAP) {
+        const current = queue.shift();
+        if (!current || visited.has(current.url)) continue;
+        visited.add(current.url);
+
+        try {
+            const html = await fetchPage(current.url);
+            const { text, links } = extractVisibleTextAndLinks(html, current.url);
+
+            if (text && text.length >= 20) {
+                const trimmed = text.slice(0, SAFE_CRAWL_MAX_TEXT_PER_PAGE);
+                const prefix = `Source: ${current.url}\n`;
+                const remaining = SAFE_CRAWL_TOTAL_TEXT_CAP - textLength;
+                const chunk = `${prefix}${trimmed}\n\n`;
+
+                if (remaining > 0) {
+                    textParts.push(chunk.slice(0, remaining));
+                    textLength += Math.min(chunk.length, remaining);
+                }
+            }
+
+            if (current.depth >= SAFE_CRAWL_MAX_DEPTH) continue;
+
+            const nextLinks = [...new Set(links)]
+                .map(normalizeUrl)
+                .filter(Boolean)
+                .filter(url => !visited.has(url))
+                .filter(url => !hasBlockedExtension(url))
+                .filter(url => isSameDomainUrl(current.base, url))
+                .map((url) => ({ url, score: scoreLink(url) }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, SAFE_CRAWL_MAX_LINKS_PER_PAGE)
+                .map((row) => row.url);
+
+            for (const nextUrl of nextLinks) {
+                if (visited.has(nextUrl)) continue;
+                queue.push({ url: nextUrl, depth: current.depth + 1, base: current.base });
+            }
+        } catch (error) {
+            crawlErrors.push(`${current.url} -> ${error.message}`);
+            console.warn(`Crawl skip for ${current.url}: ${error.message}`);
+        }
+    }
+
+    if (textParts.length === 0) {
+        throw new Error(`Failed to extract readable content from seed/subsection crawl. Attempts: ${crawlErrors.join(' | ')}`);
+    }
+
+    return {
+        text: textParts.join(' ').slice(0, SAFE_CRAWL_TOTAL_TEXT_CAP),
+        pagesVisited: visited.size,
+        errors: crawlErrors
+    };
 }
 
 async function analyzeWithGemini(text) {
@@ -263,25 +466,9 @@ async function scrapeOrganization(organization) {
         throw new Error(`Organization ${organization.name} has no URL configured to scrape.`);
     }
 
-    let text = null;
-    let lastError = null;
-    const attemptErrors = [];
-
-    for (const url of candidateUrls) {
-        try {
-            text = await fetchAndExtractText(url);
-            break;
-        } catch (error) {
-            lastError = error;
-            attemptErrors.push(`${url} -> ${error.message}`);
-            console.warn(`Failed to fetch ${url} for ${organization.name}. Trying next URL if available...`);
-        }
-    }
-
-    if (!text) {
-        const details = attemptErrors.length > 0 ? ` Attempts: ${attemptErrors.join(' | ')}` : '';
-        throw new Error(`Failed to fetch any scrape URL for ${organization.name}.${details}`);
-    }
+    const crawlResult = await crawlRelevantContent(candidateUrls);
+    const text = crawlResult.text;
+    console.log(`Crawled ${crawlResult.pagesVisited} page(s) for ${organization.name}.`);
 
     // 2. Send to Gemini
     return await analyzeWithGemini(text);
