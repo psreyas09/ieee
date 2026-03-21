@@ -22,6 +22,11 @@ A full-stack web application designed for IEEE student members to discover compe
    - Admin UI now keeps these heavy sections collapsed by default and expands on demand
    - Admin dashboard data loading is resilient to partial API failures (existing data still renders)
 - Scrape health endpoints now include a production-safe fallback if `ScrapeRunLog` migration is pending.
+- Opportunity link quality and fallback behavior were improved:
+   - drops hard-dead event links (`404`/`410`)
+   - ignores generic section roots (e.g., `/events`, `/awards`) as event links
+   - if no valid event link remains, falls back to organization link (`officialWebsite`, then first configured scrape URL)
+- Opportunity cards/details now show region restriction badges when eligibility text clearly ties participation to a specific country/region.
 - Admin dashboard now supports full scrape URL management per organization:
    - add a new scrape URL
    - edit all explicit scrape URLs (one per line)
@@ -221,3 +226,8 @@ Latest logic is aligned to a day-based 7-day window. If mismatch persists in pro
 1. Ensure the latest `main` deployment is live.
 2. Hard refresh browser cache.
 3. Confirm backend and frontend are from the same release.
+
+### If opportunities still show old/missing links
+Recent link fallback logic applies on create/update during scrape runs. Existing rows may keep older `url` values until refreshed:
+1. Trigger a fresh scrape for the affected organization.
+2. Verify organization has `officialWebsite` or at least one explicit scrape URL configured.

@@ -44,6 +44,14 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 6. Prompt Gemini for strict JSON output.
 7. Parse and upsert opportunities.
 
+### Opportunity URL selection (during upsert)
+- Validate model-provided event URL.
+- Reject generic section/listing roots (e.g., `/events`, `/awards`, `/news`) as non-specific event links.
+- Drop hard-dead links (`404`/`410`) using lightweight URL checks.
+- If no valid event URL remains, fallback to organization URL in this order:
+	1. `officialWebsite`
+	2. first configured explicit scrape URL
+
 ### Model strategy
 - Primary: `gemini-2.5-flash-lite`
 - Fallback: `gemini-2.5-flash`
@@ -98,6 +106,13 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 	 - admin dashboard uses partial-load fetch strategy so one failing section does not blank the full page
 10. Count consistency fix:
 	 - closing-soon stats API and dashboard urgent list now share day-boundary 7-day logic to reduce count/card mismatch
+11. Link trust and continuity improvements:
+	 - scraper no longer stores generic listing roots as opportunity links
+	 - hard-dead links are filtered before save
+	 - missing/invalid event links now fallback to organization-level URL
+12. Region restriction visibility:
+	 - cards and detail pages show `Region Restricted`/`<Place> Only` badges when eligibility text clearly ties participants to a country or region
+	 - generic wording without concrete geography is intentionally not flagged
 
 ## API Surface (Key Endpoints)
 

@@ -29,6 +29,8 @@ This file is a quick restart guide for future chats and contributors.
   - binary/document links skipped
 - Scraper now returns clear anti-bot message when all subsection attempts are 403.
 - Closing soon count/feed mismatch fixed by aligning to day-boundary 7-day logic.
+- Opportunity URL pipeline now filters low-quality links (generic roots, hard-dead links) and falls back to organization URL when event URL is unavailable.
+- Region restriction badges now rely on eligibility + geography signals to reduce false positives while still labeling clear cases (e.g., `Uganda Only`).
 
 ## Scraper Safety Knobs (optional env vars)
 - `SCRAPER_MAX_PAGES` (default `8`)
