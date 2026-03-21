@@ -168,6 +168,13 @@ const getBestFieldValue = (records, field) => {
     return null;
 };
 
+const getNormalizedOpportunityUrl = (value) => {
+    if (typeof value !== 'string') return null;
+    const cleaned = value.trim();
+    if (!cleaned) return null;
+    return isValidHttpUrl(cleaned) ? cleaned : null;
+};
+
 const processScrapedOpportunities = async (organization, opportunities) => {
     let addedCount = 0;
 
@@ -192,7 +199,7 @@ const processScrapedOpportunities = async (organization, opportunities) => {
                     description: opp.description || '',
                     deadline: parsedDate,
                     eligibility: opp.eligibility,
-                    url: opp.url || organization.officialWebsite,
+                    url: getNormalizedOpportunityUrl(opp.url),
                     type: opp.type || 'Other',
                     status: finalStatus,
                     source: 'auto',
@@ -212,7 +219,7 @@ const processScrapedOpportunities = async (organization, opportunities) => {
                 lastFetchedAt: new Date(),
                 deadline: parsedDate || existing.deadline,
                 status: finalStatus,
-                url: opp.url || existing.url
+                url: getNormalizedOpportunityUrl(opp.url) || existing.url
             }
         });
     }
