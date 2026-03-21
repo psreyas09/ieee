@@ -15,10 +15,8 @@ const RESTRICTION_TRIGGERS = [
     /\bonly\b/i,
     /\brestricted\b/i,
     /\bapplicants? from\b/i,
-    /\bopen to\b/i,
     /\beligible.*(residents?|citizens?|students?)\b/i,
     /\bfor students in\b/i,
-    /\bwithin\b/i,
     /\blimited to\b/i
 ];
 
@@ -35,5 +33,6 @@ export function getRegionRestriction(opportunity) {
         }
     }
 
-    return { isRestricted: true, label: 'Region Restricted' };
+    // Avoid false positives from generic eligibility text unless a specific region is detected.
+    return { isRestricted: false, label: '' };
 }
