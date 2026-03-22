@@ -21,6 +21,9 @@ const geminiApiKeys = getGeminiApiKeys();
 const geminiClients = geminiApiKeys.map(apiKey => new GoogleGenAI({ apiKey }));
 let nextGeminiClientIndex = 0;
 
+const GEMINI_PRIMARY_MODEL = 'gemini-3.1-flash-lite-preview';
+const GEMINI_FALLBACK_MODEL = 'gemini-3.1-flash';
+
 const SAFE_CRAWL_MAX_PAGES = Number(process.env.SCRAPER_MAX_PAGES || 8);
 const SAFE_CRAWL_MAX_DEPTH = Number(process.env.SCRAPER_MAX_DEPTH || 1);
 const SAFE_CRAWL_MAX_LINKS_PER_PAGE = Number(process.env.SCRAPER_MAX_LINKS_PER_PAGE || 10);
@@ -435,21 +438,21 @@ async function analyzeWithGemini(text) {
     };
 
     try {
-        console.log("Attempting extraction with gemini-2.5-flash-lite...");
-        const opportunities = await tryModel('gemini-2.5-flash-lite');
+        console.log(`Attempting extraction with ${GEMINI_PRIMARY_MODEL}...`);
+        const opportunities = await tryModel(GEMINI_PRIMARY_MODEL);
         return { success: true, data: opportunities, raw: null };
     } catch (liteError) {
         const errMsg = liteError.message || '';
         const isQuotaError = liteError.status === 429 || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED');
 
         if (isQuotaError) {
-            console.warn('flash-lite quota/rate-limit hit. Trying gemini-2.5-flash fallback...');
+            console.warn(`${GEMINI_PRIMARY_MODEL} quota/rate-limit hit. Trying ${GEMINI_FALLBACK_MODEL} fallback...`);
         } else {
-            console.warn(`flash-lite parsing failed: ${errMsg}. Falling back to gemini-2.5-flash...`);
+            console.warn(`${GEMINI_PRIMARY_MODEL} parsing failed: ${errMsg}. Falling back to ${GEMINI_FALLBACK_MODEL}...`);
         }
 
         try {
-            const opportunities = await tryModel('gemini-2.5-flash');
+            const opportunities = await tryModel(GEMINI_FALLBACK_MODEL);
             return { success: true, data: opportunities, raw: null };
         } catch (flashError) {
             const flashMsg = flashError.message || '';

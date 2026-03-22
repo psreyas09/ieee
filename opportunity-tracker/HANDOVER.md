@@ -22,6 +22,9 @@ This file is a quick restart guide for future chats and contributors.
 ## Important Recent Fixes
 - Admin dashboard no longer blanks when one section API fails.
 - Scrape health endpoint has fallback behavior when `ScrapeRunLog` table is missing.
+- Gemini scraper model updated for API deprecation readiness:
+  - primary: `gemini-3.1-flash-lite-preview`
+  - fallback: `gemini-3.1-flash`
 - Scraper now does safe bounded subsection crawling:
   - same-domain only
   - depth/page/text caps

@@ -53,8 +53,8 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 	2. first configured explicit scrape URL
 
 ### Model strategy
-- Primary: `gemini-2.5-flash-lite`
-- Fallback: `gemini-2.5-flash`
+- Primary: `gemini-3.1-flash-lite-preview`
+- Fallback: `gemini-3.1-flash`
 - Retry logic for temporary errors (`429`, `503`, transient fetch errors)
 - Multi-key failover across `GEMINI_API_KEY`, `GEMINI_API_KEY_2`, or `GEMINI_API_KEYS` CSV
 - Returns explicit quota metadata when both models/keys are exhausted (`429`, `retryAfterSec`)
