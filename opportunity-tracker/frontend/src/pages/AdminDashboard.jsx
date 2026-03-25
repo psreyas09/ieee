@@ -644,11 +644,11 @@ export default function AdminDashboard() {
                                         </td>
                                         <td className="py-3 px-4">
                                             {opp.verified ? (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs font-semibold rounded-full">
                                                     ✓ Verified
                                                 </span>
                                             ) : (
-                                                <span className="text-xs text-slate-400">Unverified</span>
+                                                <span className="text-xs text-slate-400 dark:text-slate-500">Unverified</span>
                                             )}
                                         </td>
                                         <td className="py-3 px-4">
@@ -657,19 +657,19 @@ export default function AdminDashboard() {
                                                     onClick={() => handleVerifyToggle(opp.id, opp.verified)}
                                                     className={`px-2.5 py-1.5 text-xs font-medium rounded transition-colors ${
                                                         opp.verified
-                                                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                                                            ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800'
+                                                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'
                                                     }`}
                                                     title={opp.verified ? 'Remove verification' : 'Mark as verified'}
                                                 >
                                                     {opp.verified ? '✓Verify' : 'Verify'}
                                                 </button>
                                                 {opp.url && (
-                                                    <a href={opp.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-ieee-blue bg-white rounded shadow-sm border border-slate-200">
+                                                    <a href={opp.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-ieee-blue dark:text-slate-500 dark:hover:text-blue-400 bg-white dark:bg-slate-700 rounded shadow-sm border border-slate-200 dark:border-slate-600">
                                                         <ExternalLink size={14} />
                                                     </a>
                                                 )}
-                                                <button onClick={() => handleDelete(opp.id)} className="p-1.5 text-slate-400 hover:text-red-600 bg-white rounded shadow-sm border border-slate-200">
+                                                <button onClick={() => handleDelete(opp.id)} className="p-1.5 text-slate-400 hover:text-red-600 dark:text-slate-500 dark:hover:text-red-400 bg-white dark:bg-slate-700 rounded shadow-sm border border-slate-200 dark:border-slate-600">
                                                     <Trash2 size={14} />
                                                 </button>
                                             </div>
