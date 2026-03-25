@@ -920,10 +920,10 @@ export default function AdminDashboard() {
             {/* Manual Entry Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                            <h2 className="text-xl font-bold text-slate-800">{editingOpportunityId ? 'Edit Opportunity' : 'Add Manual Opportunity'}</h2>
-                            <button onClick={() => { setShowModal(false); setEditingOpportunityId(null); }} className="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-full border border-slate-200 shadow-sm transition-colors">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/30">
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{editingOpportunityId ? 'Edit Opportunity' : 'Add Manual Opportunity'}</h2>
+                            <button onClick={() => { setShowModal(false); setEditingOpportunityId(null); }} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 bg-white dark:bg-slate-700 p-1 rounded-full border border-slate-200 dark:border-slate-600 shadow-sm transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -931,12 +931,12 @@ export default function AdminDashboard() {
                         <form onSubmit={handleModalSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1 md:col-span-2">
-                                    <label htmlFor="manual-org" className="text-sm font-semibold text-slate-700">Organization / Society <span className="text-red-500">*</span></label>
+                                    <label htmlFor="manual-org" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Organization / Society <span className="text-red-500">*</span></label>
                                     <select
                                         id="manual-org"
                                         name="organizationId"
                                         required
-                                        className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white"
+                                        className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                                         value={formData.organizationId}
                                         onChange={(e) => setFormData({ ...formData, organizationId: e.target.value })}
                                     >
@@ -946,13 +946,13 @@ export default function AdminDashboard() {
                                 </div>
 
                                 <div className="space-y-1 md:col-span-2">
-                                    <label htmlFor="manual-title" className="text-sm font-semibold text-slate-700">Title <span className="text-red-500">*</span></label>
-                                    <input id="manual-title" name="title" type="text" required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g. IEEE Global Student Hardware Competition" />
+                                    <label htmlFor="manual-title" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Title <span className="text-red-500">*</span></label>
+                                    <input id="manual-title" name="title" type="text" required className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g. IEEE Global Student Hardware Competition" />
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label htmlFor="manual-type" className="text-sm font-semibold text-slate-700">Type <span className="text-red-500">*</span></label>
-                                    <select id="manual-type" name="type" required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
+                                    <label htmlFor="manual-type" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Type <span className="text-red-500">*</span></label>
+                                    <select id="manual-type" name="type" required className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
                                         <option value="Competition">Competition</option>
                                         <option value="Hackathon">Hackathon</option>
                                         <option value="Grant">Grant</option>
@@ -965,8 +965,8 @@ export default function AdminDashboard() {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label htmlFor="manual-status" className="text-sm font-semibold text-slate-700">Status <span className="text-red-500">*</span></label>
-                                    <select id="manual-status" name="status" required className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
+                                    <label htmlFor="manual-status" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Status <span className="text-red-500">*</span></label>
+                                    <select id="manual-status" name="status" required className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
                                         <option value="Live">Live</option>
                                         <option value="Upcoming">Upcoming</option>
                                         <option value="Closed">Closed</option>
@@ -974,27 +974,27 @@ export default function AdminDashboard() {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label htmlFor="manual-deadline" className="text-sm font-semibold text-slate-700">Deadline (Optional)</label>
-                                    <input id="manual-deadline" name="deadline" type="date" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.deadline} onChange={e => setFormData({ ...formData, deadline: e.target.value })} />
+                                    <label htmlFor="manual-deadline" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Deadline (Optional)</label>
+                                    <input id="manual-deadline" name="deadline" type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100" value={formData.deadline} onChange={e => setFormData({ ...formData, deadline: e.target.value })} />
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label htmlFor="manual-url" className="text-sm font-semibold text-slate-700">Official Link (Optional)</label>
-                                    <input id="manual-url" name="url" type="url" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.url} onChange={e => setFormData({ ...formData, url: e.target.value })} placeholder="https://..." />
+                                    <label htmlFor="manual-url" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Official Link (Optional)</label>
+                                    <input id="manual-url" name="url" type="url" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500" value={formData.url} onChange={e => setFormData({ ...formData, url: e.target.value })} placeholder="https://..." />
                                 </div>
 
                                 <div className="space-y-1 md:col-span-2">
-                                    <label htmlFor="manual-description" className="text-sm font-semibold text-slate-700">Description <span className="text-red-500">*</span></label>
-                                    <textarea id="manual-description" name="description" required rows="3" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the opportunity..."></textarea>
+                                    <label htmlFor="manual-description" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Description <span className="text-red-500">*</span></label>
+                                    <textarea id="manual-description" name="description" required rows="3" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the opportunity..."></textarea>
                                 </div>
                                 <div className="space-y-1 md:col-span-2">
-                                    <label htmlFor="manual-eligibility" className="text-sm font-semibold text-slate-700">Eligibility (Optional)</label>
-                                    <textarea id="manual-eligibility" name="eligibility" rows="2" className="w-full border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20" value={formData.eligibility} onChange={e => setFormData({ ...formData, eligibility: e.target.value })} placeholder="Who can apply?"></textarea>
+                                    <label htmlFor="manual-eligibility" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Eligibility (Optional)</label>
+                                    <textarea id="manual-eligibility" name="eligibility" rows="2" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500" value={formData.eligibility} onChange={e => setFormData({ ...formData, eligibility: e.target.value })} placeholder="Who can apply?"></textarea>
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-                                <button type="button" onClick={() => { setShowModal(false); setEditingOpportunityId(null); }} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
+                                <button type="button" onClick={() => { setShowModal(false); setEditingOpportunityId(null); }} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">Cancel</button>
                                 <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-ieee-blue text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
                                     {isSubmitting ? <RefreshCw size={18} className="animate-spin" /> : editingOpportunityId ? <Pencil size={18} /> : <PlusCircle size={18} />}
                                     {isSubmitting ? (editingOpportunityId ? 'Updating...' : 'Saving...') : (editingOpportunityId ? 'Update Opportunity' : 'Save Opportunity')}
