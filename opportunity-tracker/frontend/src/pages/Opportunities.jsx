@@ -27,10 +27,12 @@ export default function Opportunities() {
         else setLoadingMore(true);
 
         try {
+            const hasSearch = search.trim().length > 0;
             const data = await getOpportunities({
                 search,
                 organizationId: orgId,
-                types: selectedTypes.length > 0 ? selectedTypes.join(',') : '',
+                // Search should span all types; otherwise preference defaults can hide exact matches.
+                types: hasSearch ? '' : (selectedTypes.length > 0 ? selectedTypes.join(',') : ''),
                 status,
                 limit: 50,
                 page: pageNum
