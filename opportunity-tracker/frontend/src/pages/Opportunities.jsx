@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Filter } from 'lucide-react';
 import { getOpportunities, getOrganizations } from '../services/api';
 import OpportunityCard from '../components/OpportunityCard';
+import { deriveOpportunityDefaults, getStoredPreferences } from '../utils/preferences';
 
 export default function Opportunities() {
+    const initialDefaultsRef = useRef(deriveOpportunityDefaults(getStoredPreferences()));
     const [opportunities, setOpportunities] = useState([]);
     const [orgs, setOrgs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -15,8 +17,8 @@ export default function Opportunities() {
     // Filters
     const [search, setSearch] = useState('');
     const [orgId, setOrgId] = useState('');
-    const [type, setType] = useState('');
-    const [status, setStatus] = useState('Live');
+    const [type, setType] = useState(initialDefaultsRef.current.type);
+    const [status, setStatus] = useState(initialDefaultsRef.current.status);
 
     const fetchOpps = async (pageNum = 1, isLoadMore = false) => {
         if (!isLoadMore) setLoading(true);
@@ -62,6 +64,21 @@ export default function Opportunities() {
         }, 350);
         return () => clearTimeout(delay);
     }, [search, orgId, type, status]);
+
+    useEffect(() => {
+        const applyUpdatedPreferences = () => {
+            const defaults = deriveOpportunityDefaults(getStoredPreferences());
+            setType(defaults.type);
+            setStatus(defaults.status);
+            setSearch('');
+            setOrgId('');
+        };
+
+        window.addEventListener('preferences-updated', applyUpdatedPreferences);
+        return () => {
+            window.removeEventListener('preferences-updated', applyUpdatedPreferences);
+        };
+    }, []);
 
     const handleLoadMore = () => {
         if (!loadingMore && hasMore) {

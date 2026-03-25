@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { LayoutDashboard, List, Users, Bookmark, Settings, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, List, Users, Bookmark, Settings, SlidersHorizontal, Moon, Sun } from 'lucide-react';
+import PreferencesModal from './PreferencesModal';
+import { getStoredPreferences, hasStoredPreferences, savePreferences } from '../utils/preferences';
 
 export default function Layout({ children }) {
     const [theme, setTheme] = useState('light');
+    const [showPreferencesModal, setShowPreferencesModal] = useState(false);
+    const [preferences, setPreferences] = useState(getStoredPreferences());
 
     useEffect(() => {
         const storedTheme = localStorage.getItem('theme');
@@ -25,6 +29,18 @@ export default function Layout({ children }) {
         }
         localStorage.setItem('theme', theme);
     }, [theme]);
+
+    useEffect(() => {
+        if (!hasStoredPreferences()) {
+            setShowPreferencesModal(true);
+        }
+    }, []);
+
+    const handleSavePreferences = (nextPreferences) => {
+        const saved = savePreferences(nextPreferences);
+        setPreferences(saved);
+        setShowPreferencesModal(false);
+    };
 
     const toggleTheme = () => {
         setTheme((prevTheme) => (prevTheme === 'dark' ? 'light' : 'dark'));
@@ -56,6 +72,17 @@ export default function Layout({ children }) {
                             <span className="hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
                         </button>
 
+                        <button
+                            type="button"
+                            onClick={() => setShowPreferencesModal(true)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-100 transition-colors"
+                            title="Change your preferences"
+                            aria-label="Change your preferences"
+                        >
+                            <SlidersHorizontal size={16} />
+                            <span className="hidden sm:inline">Preferences</span>
+                        </button>
+
                         <nav className="flex items-center gap-1 md:gap-4">
                         <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Dashboard" />
                         <NavItem to="/opportunities" icon={<List size={20} />} label="Feed" />
@@ -77,6 +104,13 @@ export default function Layout({ children }) {
                     <p>This platform automatically aggregates public opportunities for students.</p>
                 </div>
             </footer>
+
+            <PreferencesModal
+                isOpen={showPreferencesModal}
+                initialPreferences={preferences}
+                onSave={handleSavePreferences}
+                onClose={() => setShowPreferencesModal(false)}
+            />
         </div>
     );
 }
