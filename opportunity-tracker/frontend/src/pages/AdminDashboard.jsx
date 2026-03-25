@@ -483,12 +483,12 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-            <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
-                    <p className="text-slate-500">Manage data and trigger synchronization.</p>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Admin Dashboard</h1>
+                    <p className="text-slate-500 dark:text-slate-400">Manage data and trigger synchronization.</p>
                 </div>
-                <button onClick={logout} className="flex items-center gap-2 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg font-medium transition-colors">
+                <button onClick={logout} className="flex items-center gap-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-2 rounded-lg font-medium transition-colors">
                     <LogOut size={18} /> Logout
                 </button>
             </div>
@@ -496,11 +496,11 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
                 {/* Left Col - Organizations Scraper */}
-                <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px]">
-                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <div className="lg:col-span-1 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[600px]">
+                    <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 flex justify-between items-center">
                         <div>
-                            <h2 className="font-bold text-slate-800">Trigger Scraping</h2>
-                            <p className="text-xs text-slate-500 mt-1">Free-tier safe calls to Gemini API.</p>
+                            <h2 className="font-bold text-slate-800 dark:text-slate-100">Trigger Scraping</h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Free-tier safe calls to Gemini API.</p>
                         </div>
                         <div className="flex items-center gap-2">
                             <button
@@ -522,12 +522,12 @@ export default function AdminDashboard() {
                     </div>
 
                     {isScrapingAll && scrapeProgress && (
-                        <div className="bg-blue-50 border-b border-blue-100 p-3 text-sm text-blue-800">
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 p-3 text-sm text-blue-800 dark:text-blue-300">
                             <div className="flex justify-between mb-1">
                                 <span className="font-semibold">Sequential Scraping</span>
                                 <span>{scrapeProgress.current} / {scrapeProgress.total}</span>
                             </div>
-                            <div className="w-full bg-blue-200 rounded-full h-1.5 mb-2">
+                            <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-1.5 mb-2">
                                 <div className="bg-ieee-blue h-1.5 rounded-full transition-all duration-300" style={{ width: `${(scrapeProgress.current / scrapeProgress.total) * 100}%` }}></div>
                             </div>
                             <p className="text-xs truncate">Current: {scrapeProgress.name}</p>
@@ -536,14 +536,14 @@ export default function AdminDashboard() {
 
                     <div className="overflow-y-auto flex-grow p-4 space-y-3">
                         {orgs.map(org => (
-                            <div key={org.id} className="border border-slate-200 rounded-lg p-3 hover:border-ieee-blue/30 transition-colors">
+                            <div key={org.id} className="border border-slate-200 dark:border-slate-600 rounded-lg p-3 hover:border-ieee-blue/30 dark:hover:border-blue-400/30 transition-colors bg-slate-50 dark:bg-slate-700/50">
                                 {(() => {
                                     const scrapeUrls = getDisplayScrapeUrls(org);
                                     return (
                                 <div className="flex justify-between items-start gap-2">
                                     <div className="min-w-0 flex-1">
-                                        <p className="font-semibold text-sm text-slate-800 truncate" title={org.name}>{org.name}</p>
-                                        <p className="text-xs text-slate-500 mt-0.5">
+                                        <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate" title={org.name}>{org.name}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                             Last: {org.lastScrapedAt ? new Date(org.lastScrapedAt).toLocaleString() : 'Never'}
                                         </p>
                                         <div className="mt-2 space-y-1">
@@ -706,14 +706,14 @@ export default function AdminDashboard() {
 
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h2 className="font-bold text-slate-800">Scrape Health</h2>
-                        <p className="text-xs text-slate-500 mt-1">7-day reliability snapshot across organizations.</p>
+                        <h2 className="font-bold text-slate-800 dark:text-slate-100">Scrape Health</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">7-day reliability snapshot across organizations.</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <label className={`inline-flex items-center gap-2 text-sm text-slate-700 ${!showScrapeHealth ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label className={`inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 ${!showScrapeHealth ? 'opacity-50 pointer-events-none' : ''}`}>
                             <input
                                 type="checkbox"
                                 checked={failedOnly}
@@ -725,7 +725,7 @@ export default function AdminDashboard() {
                         </label>
                         <button
                             onClick={() => setShowScrapeHealth((prev) => !prev)}
-                            className="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-slate-200 text-slate-700 hover:bg-slate-300"
+                            className="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
                         >
                             {showScrapeHealth ? 'Hide' : 'Expand'}
                         </button>
@@ -735,57 +735,57 @@ export default function AdminDashboard() {
                 {showScrapeHealth ? (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm border-collapse">
-                            <thead className="bg-slate-50">
+                            <thead className="bg-slate-50 dark:bg-slate-700">
                                 <tr>
-                                    <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('org')}>Org</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('lastScrape')}>Last Scrape</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('lastStatus')}>Last Status</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('success7d')}>Success 7d</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('failed7d')}>Failed 7d</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('added7d')}>Added 7d</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700 cursor-pointer" onClick={() => setHealthSort('successRate')}>Success Rate</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700">Last Error</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200 cursor-pointer" onClick={() => setHealthSort('org')}>Org</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200 cursor-pointer" onClick={() => setHealthSort('lastScrape')}>Last Scrape</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200 cursor-pointer" onClick={() => setHealthSort('lastStatus')}>Last Status</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200 cursor-pointer" onClick={() => setHealthSort('success7d')}>Success 7d</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200 cursor-pointer" onClick={() => setHealthSort('failed7d')}>Failed 7d</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200 cursor-pointer" onClick={() => setHealthSort('added7d')}>Added 7d</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200 cursor-pointer" onClick={() => setHealthSort('successRate')}>Success Rate</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200">Last Error</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredHealthRows.map((row) => (
-                                    <tr key={row.organizationId} className="border-t border-slate-100 hover:bg-slate-50">
-                                        <td className="py-3 px-4 font-medium text-slate-800">{row.organizationName}</td>
-                                        <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{row.lastScrapedAt ? new Date(row.lastScrapedAt).toLocaleString() : 'Never'}</td>
+                                    <tr key={row.organizationId} className="border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                                        <td className="py-3 px-4 font-medium text-slate-800 dark:text-slate-100">{row.organizationName}</td>
+                                        <td className="py-3 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">{row.lastScrapedAt ? new Date(row.lastScrapedAt).toLocaleString() : 'Never'}</td>
                                         <td className="py-3 px-4">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.lastStatus === 'success' ? 'bg-green-100 text-green-700' : row.lastStatus === 'failed' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.lastStatus === 'success' ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' : row.lastStatus === 'failed' ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
                                                 {row.lastStatus}
                                             </span>
                                         </td>
-                                        <td className="py-3 px-4 text-slate-700">{row.success7d}</td>
-                                        <td className="py-3 px-4 text-slate-700">{row.failed7d}</td>
-                                        <td className="py-3 px-4 text-slate-700">{row.opportunitiesAdded7d}</td>
-                                        <td className="py-3 px-4 text-slate-700">{row.successRate}%</td>
-                                        <td className="py-3 px-4 text-slate-600 max-w-[280px] truncate" title={row.lastError || ''}>{row.lastError || '-'}</td>
+                                        <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{row.success7d}</td>
+                                        <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{row.failed7d}</td>
+                                        <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{row.opportunitiesAdded7d}</td>
+                                        <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{row.successRate}%</td>
+                                        <td className="py-3 px-4 text-slate-600 dark:text-slate-400 max-w-[280px] truncate" title={row.lastError || ''}>{row.lastError || '-'}</td>
                                     </tr>
                                 ))}
                                 {filteredHealthRows.length === 0 && (
                                     <tr>
-                                        <td colSpan="8" className="py-8 text-center text-slate-500">No scrape health rows available for the current filter.</td>
+                                        <td colSpan="8" className="py-8 text-center text-slate-500 dark:text-slate-400">No scrape health rows available for the current filter.</td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
                 ) : (
-                    <div className="px-4 py-3 text-sm text-slate-500">Collapsed. Click Expand to view scrape metrics.</div>
+                    <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">Collapsed. Click Expand to view scrape metrics.</div>
                 )}
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between gap-3">
                     <div>
-                        <h2 className="font-bold text-slate-800">Duplicate Merge</h2>
-                        <p className="text-xs text-slate-500 mt-1">Review likely duplicates, choose a primary record, and merge safely.</p>
+                        <h2 className="font-bold text-slate-800 dark:text-slate-100">Duplicate Merge</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Review likely duplicates, choose a primary record, and merge safely.</p>
                     </div>
                     <button
                         onClick={() => setShowDuplicateMerge((prev) => !prev)}
-                        className="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-slate-200 text-slate-700 hover:bg-slate-300"
+                        className="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
                     >
                         {showDuplicateMerge ? 'Hide' : 'Expand'}
                     </button>
