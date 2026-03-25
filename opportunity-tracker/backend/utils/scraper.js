@@ -320,6 +320,14 @@ async function crawlRelevantContent(seedUrls) {
     const blockedBy403 = [];
     let textLength = 0;
 
+    const buildAttemptSummary = (errors) => {
+        if (!errors || errors.length === 0) return 'none';
+        const maxItems = 8;
+        const items = errors.slice(0, maxItems);
+        const suffix = errors.length > maxItems ? ` | ... +${errors.length - maxItems} more` : '';
+        return `${items.join(' | ')}${suffix}`;
+    };
+
     while (queue.length > 0 && visited.size < SAFE_CRAWL_MAX_PAGES && textLength < SAFE_CRAWL_TOTAL_TEXT_CAP) {
         const current = queue.shift();
         if (!current || visited.has(current.url)) continue;
@@ -372,7 +380,30 @@ async function crawlRelevantContent(seedUrls) {
             throw new Error('Target website blocked the scraper on all attempted subsection URLs (403 anti-bot protection). Add a direct public content URL in admin scrape URLs or use manual entry.');
         }
 
-        throw new Error(`Failed to extract readable content from seed/subsection crawl. Attempts: ${crawlErrors.join(' | ')}`);
+        // Last-resort fallback: some pages expose usable metadata/anchor text on seed URLs,
+        // even when bounded subsection crawling yields no readable chunks.
+        const fallbackErrors = [];
+        for (const seedUrl of normalizedSeeds.slice(0, 3)) {
+            try {
+                const extracted = await fetchAndExtractText(seedUrl);
+                if (extracted && extracted.length >= 20) {
+                    return {
+                        text: `Source: ${seedUrl}\n${extracted}`.slice(0, SAFE_CRAWL_TOTAL_TEXT_CAP),
+                        pagesVisited: visited.size,
+                        errors: [...crawlErrors, `fallback-success:${seedUrl}`]
+                    };
+                }
+            } catch (fallbackError) {
+                fallbackErrors.push(`${seedUrl} -> ${fallbackError.message}`);
+            }
+        }
+
+        throw new Error(
+            `Failed to extract readable content from seed/subsection crawl. ` +
+            `Crawl attempts: ${buildAttemptSummary(crawlErrors)}. ` +
+            `Direct-seed fallback attempts: ${buildAttemptSummary(fallbackErrors)}. ` +
+            `Add a direct public opportunity/events URL in admin scrape URLs or use manual entry for this source.`
+        );
     }
 
     return {

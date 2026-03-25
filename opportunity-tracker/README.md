@@ -5,7 +5,14 @@ A full-stack web application designed for IEEE student members to discover compe
 - Frontend: React + Vite + Tailwind CSS
 - Backend: Node.js (Express -> Vercel Serverless Functions)
 - Database: PostgreSQL (Neon) via Prisma
-- AI Scraping: Cheerio API & Google Gemini 2.5 Flash
+- AI Scraping: Axios + Cheerio + Google Gemini API (`gemini-3.1-flash-lite-preview`, fallback `gemini-3.1-flash`)
+
+## Scraper Provider Map
+- URL sourcing: Organization `scrapeUrls` / `scrapeUrl`, fallback `officialWebsite` (backend + Prisma).
+- HTTP fetch provider: `axios` with browser-like headers.
+- HTML parsing provider: `cheerio`.
+- AI extraction provider: Google Gemini API via `@google/genai`.
+- Persistence provider: Prisma ORM writing to Neon PostgreSQL.
 
 ## Recent Feature Updates
 - Scraper now supports **safe bounded subsection crawling** to improve opportunity discovery:

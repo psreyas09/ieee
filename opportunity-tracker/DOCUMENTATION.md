@@ -31,6 +31,22 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 
 ## Scraping Pipeline
 
+### Provider map (what is used for each step)
+1. URL source selection:
+	- provider: backend logic + Prisma `Organization` fields (`scrapeUrls`/`scrapeUrl`/`officialWebsite`)
+2. Web fetch:
+	- provider: `axios` HTTP client (+ Node `https` agent)
+3. HTML/content extraction:
+	- provider: `cheerio`
+4. AI structuring/extraction:
+	- provider: Google Gemini API via `@google/genai`
+	- primary model: `gemini-3.1-flash-lite-preview`
+	- fallback model: `gemini-3.1-flash`
+5. Validation + link quality checks:
+	- provider: backend URL validators and lightweight HTTP status checks
+6. Persistence:
+	- provider: Prisma ORM -> Neon PostgreSQL
+
 ### Ingestion flow
 1. Choose target URLs: all explicit `scrapeUrls` (or parsed `scrapeUrl`) first, then `officialWebsite` fallback.
 2. Perform safe bounded subsection crawl:
