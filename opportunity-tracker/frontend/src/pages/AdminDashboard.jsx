@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOrganization, createOrganization, addOrganizationScrapeUrl, deleteOrganizationScrapeUrl, getScrapeHealth, getDuplicateGroups, mergeDuplicates, verifyOpportunity } from '../services/api';
+import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOpportunity, updateOrganization, createOrganization, addOrganizationScrapeUrl, deleteOrganizationScrapeUrl, getScrapeHealth, getDuplicateGroups, mergeDuplicates, verifyOpportunity } from '../services/api';
 import { Activity, Trash2, ExternalLink, RefreshCw, LogOut, PlusCircle, X, Pencil } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -24,6 +24,7 @@ export default function AdminDashboard() {
     const [showScrapeHealth, setShowScrapeHealth] = useState(false);
     const [showDuplicateMerge, setShowDuplicateMerge] = useState(false);
     const [showModal, setShowModal] = useState(false);
+    const [editingOpportunityId, setEditingOpportunityId] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         title: '', description: '', deadline: '', eligibility: '', url: '', type: 'Competition', status: 'Live', organizationId: ''
@@ -451,17 +452,50 @@ export default function AdminDashboard() {
         }
     };
 
+    const getDateInputValue = (value) => {
+        if (!value) return '';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+    };
+
+    const openCreateOpportunityModal = () => {
+        setEditingOpportunityId(null);
+        setFormData({ title: '', description: '', deadline: '', eligibility: '', url: '', type: 'Competition', status: 'Live', organizationId: '' });
+        setShowModal(true);
+    };
+
+    const openEditOpportunityModal = (opp) => {
+        setEditingOpportunityId(opp.id);
+        setFormData({
+            title: opp.title || '',
+            description: opp.description || '',
+            deadline: getDateInputValue(opp.deadline),
+            eligibility: opp.eligibility || '',
+            url: opp.url || '',
+            type: opp.type || 'Other',
+            status: opp.status || 'Live',
+            organizationId: opp.organizationId || opp.organization?.id || ''
+        });
+        setShowModal(true);
+    };
+
     const handleModalSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            await createOpportunity(formData);
-            showToast('Successfully added manual opportunity.');
+            if (editingOpportunityId) {
+                await updateOpportunity(editingOpportunityId, formData);
+                showToast('Opportunity updated successfully.');
+            } else {
+                await createOpportunity(formData);
+                showToast('Successfully added manual opportunity.');
+            }
             setShowModal(false);
+            setEditingOpportunityId(null);
             setFormData({ title: '', description: '', deadline: '', eligibility: '', url: '', type: 'Competition', status: 'Live', organizationId: '' });
             fetchData();
         } catch (err) {
-            showToast('Failed to add opportunity: ' + (err.response?.data?.error || err.message));
+            showToast((editingOpportunityId ? 'Failed to update opportunity: ' : 'Failed to add opportunity: ') + (err.response?.data?.error || err.message));
         } finally {
             setIsSubmitting(false);
         }
@@ -610,7 +644,7 @@ export default function AdminDashboard() {
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Showing up to 100 entries per page.</p>
                         </div>
                         <button
-                            onClick={() => setShowModal(true)}
+                            onClick={openCreateOpportunityModal}
                             className="px-3 py-1.5 rounded text-sm font-medium transition-colors bg-ieee-blue text-white hover:bg-blue-700 shadow-sm flex items-center gap-2"
                         >
                             <PlusCircle size={16} /> Add Manual
@@ -653,6 +687,13 @@ export default function AdminDashboard() {
                                         </td>
                                         <td className="py-3 px-4">
                                             <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => openEditOpportunityModal(opp)}
+                                                    className="p-1.5 text-slate-400 hover:text-amber-600 dark:text-slate-500 dark:hover:text-amber-400 bg-white dark:bg-slate-700 rounded shadow-sm border border-slate-200 dark:border-slate-600"
+                                                    title="Edit opportunity"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
                                                 <button
                                                     onClick={() => handleVerifyToggle(opp.id, opp.verified)}
                                                     className={`px-2.5 py-1.5 text-xs font-medium rounded transition-colors ${
@@ -881,8 +922,8 @@ export default function AdminDashboard() {
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                            <h2 className="text-xl font-bold text-slate-800">Add Manual Opportunity</h2>
-                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-full border border-slate-200 shadow-sm transition-colors">
+                            <h2 className="text-xl font-bold text-slate-800">{editingOpportunityId ? 'Edit Opportunity' : 'Add Manual Opportunity'}</h2>
+                            <button onClick={() => { setShowModal(false); setEditingOpportunityId(null); }} className="text-slate-400 hover:text-slate-600 bg-white p-1 rounded-full border border-slate-200 shadow-sm transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -953,10 +994,10 @@ export default function AdminDashboard() {
                             </div>
 
                             <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-                                <button type="button" onClick={() => setShowModal(false)} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+                                <button type="button" onClick={() => { setShowModal(false); setEditingOpportunityId(null); }} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
                                 <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-ieee-blue text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
-                                    {isSubmitting ? <RefreshCw size={18} className="animate-spin" /> : <PlusCircle size={18} />}
-                                    {isSubmitting ? 'Saving...' : 'Save Opportunity'}
+                                    {isSubmitting ? <RefreshCw size={18} className="animate-spin" /> : editingOpportunityId ? <Pencil size={18} /> : <PlusCircle size={18} />}
+                                    {isSubmitting ? (editingOpportunityId ? 'Updating...' : 'Saving...') : (editingOpportunityId ? 'Update Opportunity' : 'Save Opportunity')}
                                 </button>
                             </div>
                         </form>
