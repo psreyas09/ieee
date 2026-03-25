@@ -604,10 +604,10 @@ export default function AdminDashboard() {
 
                 {/* Right Col - Recent / Manage Opportunities */}
                 <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px]">
-                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                    <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 flex justify-between items-center">
                         <div>
-                            <h2 className="font-bold text-slate-800">Recent Opportunities</h2>
-                            <p className="text-xs text-slate-500 mt-1">Showing up to 100 entries per page.</p>
+                            <h2 className="font-bold text-slate-800 dark:text-slate-100">Recent Opportunities</h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Showing up to 100 entries per page.</p>
                         </div>
                         <button
                             onClick={() => setShowModal(true)}
@@ -619,26 +619,26 @@ export default function AdminDashboard() {
 
                     <div className="overflow-x-auto overflow-y-auto flex-grow">
                         <table className="w-full text-left border-collapse text-sm">
-                            <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                            <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10 shadow-sm">
                                 <tr>
-                                    <th className="py-3 px-4 font-semibold text-slate-700">Title</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700">Organization</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700">Type</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700">Status</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700">Verified</th>
-                                    <th className="py-3 px-4 font-semibold text-slate-700">Actions</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200">Title</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200">Organization</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200">Type</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200">Status</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200">Verified</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700 dark:text-slate-200">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {opps.map(opp => (
-                                    <tr key={opp.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                    <tr key={opp.id} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                         <td className="py-3 px-4 max-w-xs block truncate" title={opp.title}>
-                                            <span className="font-medium text-slate-800">{opp.title}</span>
+                                            <span className="font-medium text-slate-800 dark:text-slate-100">{opp.title}</span>
                                         </td>
-                                        <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{opp.organization?.name || 'Unknown'}</td>
-                                        <td className="py-3 px-4 text-slate-600">{opp.type}</td>
+                                        <td className="py-3 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">{opp.organization?.name || 'Unknown'}</td>
+                                        <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{opp.type}</td>
                                         <td className="py-3 px-4">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${opp.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${opp.status === 'Live' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
                                                 {opp.status}
                                             </span>
                                         </td>
@@ -685,19 +685,19 @@ export default function AdminDashboard() {
                         </table>
                     </div>
                     {/* Pagination Controls */}
-                    <div className="p-4 border-t border-slate-100 flex justify-between items-center bg-slate-50/50 mt-auto">
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/30 mt-auto">
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
                             disabled={page === 1}
-                            className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                            className="px-4 py-2 text-sm font-medium border border-slate-200 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-50 transition-colors"
                         >
                             Previous
                         </button>
-                        <span className="text-sm font-medium text-slate-600">Page {page} of {totalPages}</span>
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Page {page} of {totalPages}</span>
                         <button
                             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages}
-                            className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-lg text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                            className="px-4 py-2 text-sm font-medium border border-slate-200 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-50 transition-colors"
                         >
                             Next
                         </button>
