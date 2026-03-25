@@ -38,11 +38,11 @@ export default function OpportunityCard({ opportunity, onSaveToggle }) {
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'Live': return 'bg-green-100 text-green-800 border-green-200';
-            case 'Upcoming': return 'bg-blue-100 text-blue-800 border-blue-200';
-            case 'Closed': return 'bg-slate-100 text-slate-800 border-slate-200';
-            case 'Closing Soon': return 'bg-orange-100 text-orange-800 border-orange-200';
-            default: return 'bg-slate-100 text-slate-800 border-slate-200';
+            case 'Live': return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-700';
+            case 'Upcoming': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700';
+            case 'Closed': return 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600';
+            case 'Closing Soon': return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-700';
+            default: return 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600';
         }
     };
 
@@ -51,7 +51,7 @@ export default function OpportunityCard({ opportunity, onSaveToggle }) {
 
     return (
         <Link to={`/opportunities/${opportunity.id}`} className="block group">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-all h-full flex flex-col relative overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md transition-all h-full flex flex-col relative overflow-hidden">
                 {displayStatus === 'Closing Soon' && (
                     <div className="absolute top-0 right-0 left-0 h-1 bg-orange-400"></div>
                 )}
@@ -61,12 +61,12 @@ export default function OpportunityCard({ opportunity, onSaveToggle }) {
                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${getStatusColor(displayStatus)}`}>
                             {displayStatus.toUpperCase()}
                         </span>
-                        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
                             {opportunity.type}
                         </span>
                         {regionRestriction.isRestricted && (
                             <span
-                                className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200"
+                                className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700"
                                 title={regionRestriction.label}
                             >
                                 {regionRestriction.label.toUpperCase()}
@@ -75,36 +75,36 @@ export default function OpportunityCard({ opportunity, onSaveToggle }) {
                     </div>
                     <button
                         onClick={handleSave}
-                        className={`p-1.5 rounded-full transition-colors ${saved ? 'bg-ieee-blue/10 text-ieee-blue' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
+                        className={`p-1.5 rounded-full transition-colors ${saved ? 'bg-ieee-blue/10 dark:bg-ieee-blue/20 text-ieee-blue dark:text-blue-300' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-200'}`}
                     >
                         <Bookmark size={18} fill={saved ? 'currentColor' : 'none'} />
                     </button>
                 </div>
 
-                <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-ieee-blue transition-colors line-clamp-2">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2 group-hover:text-ieee-blue transition-colors line-clamp-2">
                     {opportunity.title}
                 </h3>
 
-                <div className="flex items-center gap-1.5 text-sm text-slate-600 mb-4 font-medium">
-                    <Building size={16} className="text-slate-400" />
+                <div className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 mb-4 font-medium">
+                    <Building size={16} className="text-slate-400 dark:text-slate-500" />
                     <span className="truncate">{opportunity.organization?.name || 'Unknown Organization'}</span>
                 </div>
 
-                <p className="text-sm text-slate-600 mb-6 line-clamp-3 flex-grow">
+                <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 line-clamp-3 flex-grow">
                     {opportunity.description || 'No description available for this opportunity.'}
                 </p>
 
-                <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between text-sm">
+                <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-sm">
                     <div className="flex items-center gap-4">
                         {opportunity.deadline ? (
-                            <div className={`flex items-center gap-1.5 ${daysLeft !== null && daysLeft <= 7 && daysLeft >= 0 ? 'text-orange-600 font-semibold' : 'text-slate-500'}`}>
+                            <div className={`flex items-center gap-1.5 ${daysLeft !== null && daysLeft <= 7 && daysLeft >= 0 ? 'text-orange-600 dark:text-orange-300 font-semibold' : 'text-slate-500 dark:text-slate-400'}`}>
                                 <Calendar size={16} />
                                 <span>
                                     {new Date(opportunity.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                 </span>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-1.5 text-slate-500">
+                            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                                 <Clock size={16} />
                                 <span>No Deadline</span>
                             </div>

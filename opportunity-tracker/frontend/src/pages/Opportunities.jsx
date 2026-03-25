@@ -73,24 +73,24 @@ export default function Opportunities() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6 mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 dark:border-slate-700 pb-6 mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Opportunities Feed</h1>
-                    <p className="text-slate-500 mt-1">Discover the latest events computationally vetted for you.</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Opportunities Feed</h1>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Discover the latest events computationally vetted for you.</p>
                 </div>
             </div>
 
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="relative col-span-1 md:col-span-4 lg:col-span-1">
                     <label htmlFor="opportunity-search" className="sr-only">Search opportunities</label>
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Search className="h-5 w-5 text-slate-400" />
+                        <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
                     </div>
                     <input
                         id="opportunity-search"
                         name="search"
                         type="text"
-                        className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md leading-5 bg-white placeholder-slate-500 focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
+                        className="block w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md leading-5 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
                         placeholder="Search keywords..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
@@ -101,7 +101,7 @@ export default function Opportunities() {
                 <select
                     id="opportunity-organization"
                     name="organizationId"
-                    className="block w-full pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
+                    className="block w-full pl-3 pr-10 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
                     value={orgId}
                     onChange={(e) => setOrgId(e.target.value)}
                 >
@@ -115,7 +115,7 @@ export default function Opportunities() {
                 <select
                     id="opportunity-type"
                     name="type"
-                    className="block w-full pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
+                    className="block w-full pl-3 pr-10 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
                     value={type}
                     onChange={(e) => setType(e.target.value)}
                 >
@@ -127,7 +127,7 @@ export default function Opportunities() {
                 <select
                     id="opportunity-status"
                     name="status"
-                    className="block w-full pl-3 pr-10 py-2 border border-slate-300 bg-white rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
+                    className="block w-full pl-3 pr-10 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
                 >
@@ -141,7 +141,7 @@ export default function Opportunities() {
             {loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {[1, 2, 3, 4, 5, 6].map(i => (
-                        <div key={i} className="h-64 bg-slate-100 rounded-xl animate-pulse"></div>
+                        <div key={i} className="h-64 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse"></div>
                     ))}
                 </div>
             ) : opportunities.length > 0 ? (
@@ -155,10 +155,10 @@ export default function Opportunities() {
                             <button
                                 onClick={handleLoadMore}
                                 disabled={loadingMore}
-                                className="px-6 py-2.5 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                                className="px-6 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
                             >
                                 {loadingMore ? (
-                                    <><div className="w-5 h-5 border-2 border-slate-300 border-t-ieee-blue rounded-full animate-spin"></div> Loading...</>
+                                    <><div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-500 border-t-ieee-blue rounded-full animate-spin"></div> Loading...</>
                                 ) : (
                                     'Load More Opportunities'
                                 )}
@@ -167,10 +167,10 @@ export default function Opportunities() {
                     )}
                 </div>
             ) : (
-                <div className="text-center py-20 bg-white rounded-xl border border-slate-200">
-                    <Filter className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-                    <h3 className="text-lg font-medium text-slate-900">No opportunities found</h3>
-                    <p className="text-slate-500 mt-1">Try adjusting your filters or search terms.</p>
+                <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <Filter className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-500 mb-3" />
+                    <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">No opportunities found</h3>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Try adjusting your filters or search terms.</p>
                 </div>
             )}
         </div>

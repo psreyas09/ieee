@@ -24,49 +24,49 @@ export default function OpportunityDetail() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-            <Link to="/opportunities" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-ieee-blue mb-4">
+            <Link to="/opportunities" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-ieee-blue mb-4">
                 <ArrowLeft size={16} /> Back to feed
             </Link>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 p-8 md:p-10">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-b border-slate-200 dark:border-slate-700 p-8 md:p-10">
                     <div className="flex flex-wrap gap-2 mb-4">
-                        <span className="text-sm font-semibold px-3 py-1 rounded-full bg-ieee-blue/10 text-ieee-blue border border-ieee-blue/20">
+                        <span className="text-sm font-semibold px-3 py-1 rounded-full bg-ieee-blue/10 dark:bg-ieee-blue/20 text-ieee-blue dark:text-blue-300 border border-ieee-blue/20 dark:border-blue-700/40">
                             {opp.type}
                         </span>
-                        <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${opp.status === 'Live' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-slate-100 text-slate-800 border-slate-200'}`}>
+                        <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${opp.status === 'Live' ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-700' : 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600'}`}>
                             {opp.status.toUpperCase()}
                         </span>
                         {opp.verified && (
-                            <span className="flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                                <CheckCircle size={14} className="text-blue-500" /> Verified
+                            <span className="flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700">
+                                <CheckCircle size={14} className="text-blue-500 dark:text-blue-300" /> Verified
                             </span>
                         )}
                         {regionRestriction.isRestricted && (
-                            <span className="text-sm font-semibold px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200" title={regionRestriction.label}>
+                            <span className="text-sm font-semibold px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700" title={regionRestriction.label}>
                                 {regionRestriction.label}
                             </span>
                         )}
                     </div>
 
-                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 leading-tight mb-6">
+                    <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-slate-100 leading-tight mb-6">
                         {opp.title}
                     </h1>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-700">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-700 dark:text-slate-300">
                         <div className="flex items-center gap-3">
-                            <div className="bg-white p-2 rounded-lg shadow-sm border border-slate-100"><Building size={20} className="text-ieee-blue" /></div>
+                            <div className="bg-white dark:bg-slate-800 p-2 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700"><Building size={20} className="text-ieee-blue" /></div>
                             <div>
-                                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Organization</p>
-                                <p className="font-medium text-slate-900">{opp.organization?.name}</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Organization</p>
+                                <p className="font-medium text-slate-900 dark:text-slate-100">{opp.organization?.name}</p>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <div className="bg-white p-2 rounded-lg shadow-sm border border-slate-100"><Calendar size={20} className="text-orange-500" /></div>
+                            <div className="bg-white dark:bg-slate-800 p-2 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700"><Calendar size={20} className="text-orange-500" /></div>
                             <div>
-                                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Deadline</p>
-                                <p className="font-medium text-slate-900">
+                                <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Deadline</p>
+                                <p className="font-medium text-slate-900 dark:text-slate-100">
                                     {opp.deadline ? new Date(opp.deadline).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified or Open'}
                                 </p>
                             </div>
@@ -76,19 +76,19 @@ export default function OpportunityDetail() {
 
                 <div className="p-8 md:p-10 space-y-8">
                     <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
                             <span className="w-8 h-1 bg-ieee-blue rounded-full absolute -ml-12 hidden md:block"></span>
                             Description
                         </h2>
-                        <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
+                        <div className="prose prose-slate dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 leading-relaxed">
                             <p className="whitespace-pre-wrap">{opp.description || "No detailed description was parsed. Please visit the official link for more info."}</p>
                         </div>
                     </section>
 
                     {opp.eligibility && (
-                        <section className="bg-slate-50 rounded-xl p-6 border border-slate-100">
-                            <h2 className="text-lg font-bold text-slate-900 mb-3">Eligibility Criteria</h2>
-                            <p className="text-slate-700">{opp.eligibility}</p>
+                        <section className="bg-slate-50 dark:bg-slate-900 rounded-xl p-6 border border-slate-100 dark:border-slate-700">
+                            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-3">Eligibility Criteria</h2>
+                            <p className="text-slate-700 dark:text-slate-300">{opp.eligibility}</p>
                         </section>
                     )}
 
@@ -103,13 +103,13 @@ export default function OpportunityDetail() {
                                 Apply / Visit Official Page <Globe size={20} />
                             </a>
                         ) : (
-                            <button disabled className="flex-1 flex justify-center items-center gap-2 bg-slate-200 text-slate-500 font-bold py-4 px-6 rounded-xl cursor-not-allowed">
+                            <button disabled className="flex-1 flex justify-center items-center gap-2 bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300 font-bold py-4 px-6 rounded-xl cursor-not-allowed">
                                 No Link Provided
                             </button>
                         )}
                     </div>
 
-                    <div className="text-center text-xs text-slate-400 mt-8 pt-6 border-t border-slate-100">
+                    <div className="text-center text-xs text-slate-400 dark:text-slate-500 mt-8 pt-6 border-t border-slate-100 dark:border-slate-700">
                         Source: {opp.source === 'auto' ? 'AI Fetched' : 'Manually Added'} •
                         Last Updated: {new Date(opp.updatedAt).toLocaleDateString()}
                     </div>
