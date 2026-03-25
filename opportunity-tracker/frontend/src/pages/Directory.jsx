@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getOrganizations } from '../services/api';
-import { Globe, Clock, LayoutGrid, Users, Map } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { getOrganizations, getOpportunities } from '../services/api';
+import { Sparkles, LayoutGrid, Users, Map } from 'lucide-react';
 import { getStoredPreferences } from '../utils/preferences';
 
 const MEMBERSHIP_TYPES = [
@@ -25,65 +26,168 @@ const REGION_OPTIONS = [
 ];
 
 export default function Directory() {
+    const navigate = useNavigate();
     const [orgs, setOrgs] = useState([]);
+    const [opportunities, setOpportunities] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeType, setActiveType] = useState('society');
-    const [search, setSearch] = useState('');
     const [regionSelection, setRegionSelection] = useState(getStoredPreferences()?.region || 'Global (All Regions)');
 
     useEffect(() => {
-        getOrganizations().then(data => {
-            setOrgs(data);
-            setLoading(false);
-        }).catch(console.error);
+        Promise.all([
+            getOrganizations(),
+            getOpportunities({ status: 'Live', limit: 1000, sort: 'recent' })
+        ])
+            .then(([orgData, oppData]) => {
+                setOrgs(orgData || []);
+                setOpportunities(oppData?.data || []);
+            })
+            .catch(console.error)
+            .finally(() => setLoading(false));
     }, []);
 
-    const countsByType = useMemo(() => {
-        return {
-            society: orgs.filter((o) => o.type === 'society').length,
-            council: orgs.filter((o) => o.type === 'council').length,
-            region: orgs.filter((o) => o.type === 'region').length,
-            other: orgs.filter((o) => o.type === 'other').length
-        };
-    }, [orgs]);
+    const toQuickFilters = (payload) => {
+        localStorage.setItem('ieee.quickFilters.v1', JSON.stringify(payload));
+        window.dispatchEvent(new CustomEvent('quick-filters-updated', { detail: payload }));
+    };
 
-    const matchRegion = (org) => {
-        if (!regionSelection || regionSelection.startsWith('Global')) return true;
-        const match = regionSelection.match(/^R(\d+)/i);
+    const navigateWithFilters = (payload) => {
+        toQuickFilters(payload);
+        navigate('/opportunities');
+    };
+
+    const matchesRegion = (opp, regionLabel) => {
+        if (!regionLabel || regionLabel.startsWith('Global')) return true;
+        const match = regionLabel.match(/^R(\d+)/i);
         if (!match) return true;
-        const regionNumber = match[1];
-        const text = `${org.name || ''} ${org.officialWebsite || ''}`;
-        const regionRegex = new RegExp(`\\b(region\\s*${regionNumber}|r${regionNumber})\\b`, 'i');
-        return regionRegex.test(text);
+        const regionNo = match[1];
+        const text = `${opp.title || ''} ${opp.description || ''} ${opp.eligibility || ''}`.toLowerCase();
+        return new RegExp(`\\b(region\\s*${regionNo}|r${regionNo})\\b`, 'i').test(text);
     };
 
-    const filteredOrgs = orgs
-        .filter((o) => (activeType ? o.type === activeType : true))
-        .filter((o) => (search ? o.name.toLowerCase().includes(search.toLowerCase()) : true))
-        .filter(matchRegion);
+    const regionScopedOpps = useMemo(() => {
+        return opportunities.filter((opp) => matchesRegion(opp, regionSelection));
+    }, [opportunities, regionSelection]);
 
-    const openPreferencesModal = () => {
-        window.dispatchEvent(new Event('open-preferences-modal'));
+    const categoryCounts = useMemo(() => {
+        const categories = {
+            Competition: 0,
+            Mentorship: 0,
+            ProjectFunding: 0,
+            Award: 0,
+            Scholarship: 0,
+            Grant: 0,
+            Other: 0,
+            Workshop: 0,
+            Webinar: 0,
+            Conference: 0,
+            'Paper Contest': 0,
+            Fellowship: 0,
+            Seminar: 0,
+            Congress: 0
+        };
+
+        for (const opp of regionScopedOpps) {
+            const type = (opp.type || '').trim();
+            const text = `${opp.title || ''} ${opp.description || ''}`.toLowerCase();
+
+            if (type in categories) categories[type] += 1;
+            if (type === 'Grant') categories.ProjectFunding += 1;
+            if (type === 'Fellowship' || /mentor/i.test(text)) categories.Mentorship += 1;
+            if (/award/i.test(text)) categories.Award += 1;
+            if (/conference/i.test(text)) categories.Conference += 1;
+            if (/seminar/i.test(text)) categories.Seminar += 1;
+            if (/congress/i.test(text)) categories.Congress += 1;
+        }
+
+        return categories;
+    }, [regionScopedOpps]);
+
+    const membershipCounts = useMemo(() => {
+        const result = {
+            'Undergraduate Student': 0,
+            'Graduate Student': 0,
+            'Young Professional': 0,
+            'Non-IEEE Member': 0
+        };
+
+        for (const opp of regionScopedOpps) {
+            const text = `${opp.title || ''} ${opp.description || ''} ${opp.eligibility || ''}`.toLowerCase();
+            if (/undergraduate|bachelor/.test(text)) result['Undergraduate Student'] += 1;
+            if (/graduate|master|phd|doctoral/.test(text)) result['Graduate Student'] += 1;
+            if (/young professional|early career/.test(text)) result['Young Professional'] += 1;
+            if (/non-?ieee|public|open to all/.test(text)) result['Non-IEEE Member'] += 1;
+        }
+
+        return result;
+    }, [regionScopedOpps]);
+
+    const regionCounts = useMemo(() => {
+        return REGION_OPTIONS.reduce((acc, label) => {
+            acc[label] = opportunities.filter((opp) => matchesRegion(opp, label)).length;
+            return acc;
+        }, {});
+    }, [opportunities]);
+
+    const totalSelected = regionScopedOpps.length;
+
+    const categoryToType = {
+        Competition: ['Competition'],
+        Mentorship: ['Fellowship'],
+        ProjectFunding: ['Grant'],
+        Award: ['Other'],
+        Scholarship: ['Scholarship'],
+        Grant: ['Grant'],
+        Other: ['Other'],
+        Workshop: ['Workshop'],
+        Webinar: ['Webinar'],
+        Conference: ['Other'],
+        'Paper Contest': ['Paper Contest'],
+        Fellowship: ['Fellowship'],
+        Seminar: ['Other'],
+        Congress: ['Other']
     };
+
+    const categoryKeys = Object.keys(categoryCounts);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6 mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Organization Directory</h1>
-                    <p className="text-slate-500 mt-1">Navigate by category to find relevant IEEE entities faster.</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Explore Benefits</h1>
+                    <p className="text-slate-500 mt-1">Find opportunities by category, membership profile, and region.</p>
                 </div>
             </div>
+
+            <section className="bg-white rounded-xl border border-slate-200 shadow-sm px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <Sparkles className="text-purple-500" size={22} />
+                    <div>
+                        <p className="font-bold text-slate-900">{totalSelected} Benefits Selected For You</p>
+                        <p className="text-sm text-slate-500">Based on your profile, we&apos;ve found these opportunities.</p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => navigateWithFilters({ status: 'Live', selectedTypes: [] })}
+                    className="px-4 py-2 rounded-full bg-ieee-blue text-white text-sm font-semibold hover:bg-blue-700"
+                >
+                    Check them out
+                </button>
+            </section>
 
             <section className="space-y-3">
                 <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                     <LayoutGrid size={22} className="text-ieee-blue" /> Browse by Category
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <CategoryCard title="Societies" count={countsByType.society} active={activeType === 'society'} onClick={() => setActiveType('society')} />
-                    <CategoryCard title="Councils" count={countsByType.council} active={activeType === 'council'} onClick={() => setActiveType('council')} />
-                    <CategoryCard title="Regions" count={countsByType.region} active={activeType === 'region'} onClick={() => setActiveType('region')} />
-                    <CategoryCard title="Other" count={countsByType.other} active={activeType === 'other'} onClick={() => setActiveType('other')} />
+                    {categoryKeys.map((label) => (
+                        <CategoryCard
+                            key={label}
+                            title={label}
+                            count={categoryCounts[label]}
+                            onClick={() => navigateWithFilters({ status: 'Live', selectedTypes: categoryToType[label] || [] })}
+                        />
+                    ))}
                 </div>
             </section>
 
@@ -96,12 +200,12 @@ export default function Directory() {
                         <button
                             key={label}
                             type="button"
-                            onClick={openPreferencesModal}
+                            onClick={() => window.dispatchEvent(new Event('open-preferences-modal'))}
                             className="text-left bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:border-ieee-blue transition-colors"
                             title="Update this in Preferences"
                         >
                             <p className="font-semibold text-slate-800">{label}</p>
-                            <p className="text-sm text-slate-500 mt-1">Manage in Preferences</p>
+                            <p className="text-sm text-slate-500 mt-1">{membershipCounts[label]} matching</p>
                         </button>
                     ))}
                 </div>
@@ -120,89 +224,21 @@ export default function Directory() {
                             className={`text-left bg-white rounded-xl shadow-sm border p-4 transition-colors ${regionSelection === label ? 'border-ieee-blue ring-2 ring-ieee-blue/20' : 'border-slate-200 hover:border-ieee-blue'}`}
                         >
                             <p className="font-semibold text-slate-800 leading-snug">{label}</p>
-                            <p className="text-sm text-slate-500 mt-1">{filteredOrgs.length} available</p>
+                            <p className="text-sm text-slate-500 mt-1">{regionCounts[label] || 0} available</p>
                         </button>
                     ))}
                 </div>
             </section>
-
-            <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-                <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search organizations..."
-                    className="w-full md:w-80 border border-slate-300 rounded-lg p-2.5 outline-none focus:border-ieee-blue focus:ring-2 focus:ring-ieee-blue/20"
-                />
-                <button
-                    type="button"
-                    onClick={() => {
-                        setSearch('');
-                        setRegionSelection('Global (All Regions)');
-                    }}
-                    className="text-sm font-medium text-ieee-blue hover:underline"
-                >
-                    Reset filters
-                </button>
-            </div>
-
-            {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-h-[520px]">
-                    {[1, 2, 3, 4, 5, 6].map(i => (
-                        <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[220px] animate-pulse">
-                            <div className="h-12 bg-slate-100 rounded mb-4"></div>
-                            <div className="h-6 w-28 bg-slate-100 rounded mb-8"></div>
-                            <div className="mt-10 h-4 bg-slate-100 rounded"></div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-h-[520px]">
-                    {filteredOrgs.map(org => (
-                        <div key={org.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col hover:border-ieee-blue transition-colors min-h-[220px]">
-                            <div className="flex justify-between items-start mb-4">
-                                <h3 className="text-lg font-bold text-slate-900 leading-tight pr-4 min-h-[56px]">{org.name}</h3>
-                                <div className={`w-3 h-3 rounded-full shrink-0 mt-1 ${org._count.opportunities > 0 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-slate-300'}`} title={org._count.opportunities > 0 ? 'Active opportunities' : 'No active opportunities'}></div>
-                            </div>
-
-                            <div className="flex-grow">
-                                <div className="flex items-center gap-2 text-sm text-slate-600 mb-2 font-medium">
-                                    <span className="bg-slate-100 py-1 px-2.5 rounded-md text-slate-700">
-                                        {org._count.opportunities} Live {org._count.opportunities === 1 ? 'Entry' : 'Entries'}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                                <div className="flex items-center gap-1.5">
-                                    <Clock size={14} />
-                                    <span>
-                                        Updated
-                                        {org.lastScrapedAt
-                                            ? ` ${new Date(org.lastScrapedAt).toLocaleDateString()}`
-                                            : ' Never'}
-                                    </span>
-                                </div>
-                                {org.officialWebsite && (
-                                    <a href={org.officialWebsite} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-slate-500 hover:text-ieee-blue transition-colors hover:underline">
-                                        <Globe size={14} /> Website
-                                    </a>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
         </div>
     );
 }
 
-function CategoryCard({ title, count, active, onClick }) {
+function CategoryCard({ title, count, onClick }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            className={`text-left bg-white rounded-xl shadow-sm border p-4 transition-colors ${active ? 'border-ieee-blue ring-2 ring-ieee-blue/20' : 'border-slate-200 hover:border-ieee-blue'}`}
+            className="text-left bg-white rounded-xl shadow-sm border border-slate-200 p-4 transition-colors hover:border-ieee-blue"
         >
             <p className="font-semibold text-slate-800">{title}</p>
             <p className="text-sm text-slate-500 mt-1">{count} available</p>

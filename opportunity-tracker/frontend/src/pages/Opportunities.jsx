@@ -61,6 +61,24 @@ export default function Opportunities() {
     }, []);
 
     useEffect(() => {
+        const raw = localStorage.getItem('ieee.quickFilters.v1');
+        if (!raw) return;
+
+        try {
+            const quick = JSON.parse(raw);
+            if (Array.isArray(quick.selectedTypes)) {
+                setSelectedTypes(quick.selectedTypes);
+            }
+            if (typeof quick.status === 'string') {
+                setStatus(quick.status);
+            }
+            localStorage.removeItem('ieee.quickFilters.v1');
+        } catch {
+            localStorage.removeItem('ieee.quickFilters.v1');
+        }
+    }, []);
+
+    useEffect(() => {
         if (firstLoadRef.current) {
             firstLoadRef.current = false;
             fetchOpps(1, false);
