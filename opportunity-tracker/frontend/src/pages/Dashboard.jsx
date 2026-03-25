@@ -4,21 +4,38 @@ import { ArrowRight, Activity, TrendingUp, Users, AlertCircle } from 'lucide-rea
 import { getStats, getOpportunities } from '../services/api';
 import OpportunityCard from '../components/OpportunityCard';
 import HeroGlobe from '../components/HeroGlobe';
+import { derivePreferredTypes, getStoredPreferences } from '../utils/preferences';
 
 export default function Dashboard() {
     const [stats, setStats] = useState(null);
     const [urgent, setUrgent] = useState([]);
     const [statsLoading, setStatsLoading] = useState(true);
     const [urgentLoading, setUrgentLoading] = useState(true);
+    const [preferences, setPreferences] = useState(getStoredPreferences());
+
+    useEffect(() => {
+        const handlePreferencesUpdated = (event) => {
+            setPreferences(event.detail || getStoredPreferences());
+        };
+
+        window.addEventListener('preferences-updated', handlePreferencesUpdated);
+        return () => {
+            window.removeEventListener('preferences-updated', handlePreferencesUpdated);
+        };
+    }, []);
 
     useEffect(() => {
         const fetchData = async () => {
+            setStatsLoading(true);
+            setUrgentLoading(true);
             try {
                 const [statsData, urgentData] = await Promise.all([
                     getStats(),
                     getOpportunities({ status: 'Live', limit: 100 })
                 ]);
                 setStats(statsData);
+
+                const preferredTypes = new Set(derivePreferredTypes(preferences));
 
                 const now = new Date();
                 const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
@@ -27,6 +44,7 @@ export default function Dashboard() {
                 // Filter locally using day boundaries to match backend stats.
                 const filteredUrgent = urgentData.data.filter(opp => {
                     if (!opp.deadline) return false;
+                    if (preferredTypes.size > 0 && !preferredTypes.has(opp.type)) return false;
                     const deadline = new Date(opp.deadline);
                     return deadline >= startOfToday && deadline <= endOfWindow;
                 });
@@ -40,7 +58,7 @@ export default function Dashboard() {
             }
         };
         fetchData();
-    }, []);
+    }, [preferences]);
 
     const showClosingSoon = urgentLoading || urgent.length > 0;
 

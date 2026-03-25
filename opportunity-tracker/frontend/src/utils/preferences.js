@@ -76,3 +76,14 @@ export const deriveOpportunityDefaults = (preferences) => {
         status: 'Live'
     };
 };
+
+export const derivePreferredTypes = (preferences) => {
+    const prefs = preferences || getStoredPreferences();
+    if (!prefs) return [];
+
+    const mapped = (prefs.interests || [])
+        .map((interest) => INTEREST_TO_TYPE[String(interest).toLowerCase()])
+        .filter(Boolean);
+
+    return [...new Set(mapped)];
+};
