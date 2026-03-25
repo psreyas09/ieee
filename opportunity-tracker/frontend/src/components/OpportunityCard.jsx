@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Clock, Bookmark, Building, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, Bookmark, Building, ChevronRight, CheckCircle } from 'lucide-react';
 import { getRegionRestriction } from '../utils/regionRestriction';
 
 export default function OpportunityCard({ opportunity, onSaveToggle }) {
@@ -64,6 +64,11 @@ export default function OpportunityCard({ opportunity, onSaveToggle }) {
                         <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
                             {opportunity.type}
                         </span>
+                        {opportunity.verified && (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700">
+                                <CheckCircle size={12} /> Verified
+                            </span>
+                        )}
                         {regionRestriction.isRestricted && (
                             <span
                                 className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700"
