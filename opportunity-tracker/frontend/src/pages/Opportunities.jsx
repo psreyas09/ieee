@@ -19,31 +19,31 @@ export default function Opportunities() {
     // Filters
     const [search, setSearch] = useState('');
     const [orgId, setOrgId] = useState('');
-    const [type, setType] = useState(initialDefaultsRef.current.type);
+    const [selectedTypes, setSelectedTypes] = useState(initialPreferredTypesRef.current);
     const [status, setStatus] = useState(initialDefaultsRef.current.status);
-    const [basePreferredTypes, setBasePreferredTypes] = useState(initialPreferredTypesRef.current);
 
     const fetchOpps = async (pageNum = 1, isLoadMore = false) => {
         if (!isLoadMore) setLoading(true);
         else setLoadingMore(true);
 
         try {
-            const effectiveType = type || '';
-            const data = await getOpportunities({ search, organizationId: orgId, type: effectiveType, status, limit: 50, page: pageNum });
-
-            const shouldApplyBaseTypeFilter = !effectiveType && basePreferredTypes.length > 0;
-            const filteredData = shouldApplyBaseTypeFilter
-                ? data.data.filter((item) => basePreferredTypes.includes(item.type))
-                : data.data;
+            const data = await getOpportunities({
+                search,
+                organizationId: orgId,
+                types: selectedTypes.length > 0 ? selectedTypes.join(',') : '',
+                status,
+                limit: 50,
+                page: pageNum
+            });
 
             if (isLoadMore) {
                 setOpportunities(prev => {
                     const existingIds = new Set(prev.map(p => p.id));
-                    const newItems = filteredData.filter(d => !existingIds.has(d.id));
+                    const newItems = data.data.filter(d => !existingIds.has(d.id));
                     return [...prev, ...newItems];
                 });
             } else {
-                setOpportunities(filteredData);
+                setOpportunities(data.data);
             }
 
             setHasMore(pageNum < (data.pagination?.totalPages || 1));
@@ -72,16 +72,15 @@ export default function Opportunities() {
             fetchOpps(1, false);
         }, 350);
         return () => clearTimeout(delay);
-    }, [search, orgId, type, status, basePreferredTypes]);
+    }, [search, orgId, selectedTypes, status]);
 
     useEffect(() => {
         const applyUpdatedPreferences = () => {
             const stored = getStoredPreferences();
             const defaults = deriveOpportunityDefaults(stored);
             const preferredTypes = derivePreferredTypes(stored);
-            setType(defaults.type);
+            setSelectedTypes(preferredTypes);
             setStatus(defaults.status);
-            setBasePreferredTypes(preferredTypes);
             setSearch('');
             setOrgId('');
         };
@@ -96,6 +95,15 @@ export default function Opportunities() {
         if (!loadingMore && hasMore) {
             fetchOpps(page + 1, true);
         }
+    };
+
+    const toggleType = (nextType) => {
+        setSelectedTypes((prev) => {
+            if (prev.includes(nextType)) {
+                return prev.filter((item) => item !== nextType);
+            }
+            return [...prev, nextType];
+        });
     };
 
     const types = ["Competition", "Paper Contest", "Grant", "Hackathon", "Fellowship", "Workshop", "Webinar", "Other"];
@@ -140,17 +148,22 @@ export default function Opportunities() {
                     ))}
                 </select>
 
-                <label htmlFor="opportunity-type" className="sr-only">Filter by type</label>
-                <select
-                    id="opportunity-type"
-                    name="type"
-                    className="block w-full pl-3 pr-10 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue sm:text-sm"
-                    value={type}
-                    onChange={(e) => setType(e.target.value)}
-                >
-                    <option value="">All Types</option>
-                    {types.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <div className="border border-slate-300 dark:border-slate-600 rounded-md p-2 bg-white dark:bg-slate-700">
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wide mb-2">Types (multi-select)</p>
+                    <div className="max-h-28 overflow-y-auto space-y-1">
+                        {types.map((item) => (
+                            <label key={item} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedTypes.includes(item)}
+                                    onChange={() => toggleType(item)}
+                                    className="rounded border-slate-300 dark:border-slate-500 text-ieee-blue focus:ring-ieee-blue"
+                                />
+                                {item}
+                            </label>
+                        ))}
+                    </div>
+                </div>
 
                 <label htmlFor="opportunity-status" className="sr-only">Filter by status</label>
                 <select

@@ -535,14 +535,23 @@ app.get('/api/organizations', async (req, res) => {
 
 app.get('/api/opportunities', async (req, res) => {
     try {
-        const { organizationId, type, status, search, sort, page = 1, limit = 20 } = req.query;
+        const { organizationId, type, types, status, search, sort, page = 1, limit = 20 } = req.query;
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
 
         const where = {};
         if (organizationId) where.organizationId = organizationId;
-        if (type) where.type = type;
+        const normalizedTypes = String(types || '')
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+        if (normalizedTypes.length > 0) {
+            where.type = { in: normalizedTypes };
+        } else if (type) {
+            where.type = type;
+        }
         if (status) where.status = status;
         if (search) {
             where.OR = [
