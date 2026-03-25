@@ -1,11 +1,38 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { LayoutDashboard, List, Users, Bookmark, Settings } from 'lucide-react';
+import { LayoutDashboard, List, Users, Bookmark, Settings, Moon, Sun } from 'lucide-react';
 
 export default function Layout({ children }) {
+    const [theme, setTheme] = useState('light');
+
+    useEffect(() => {
+        const storedTheme = localStorage.getItem('theme');
+        if (storedTheme === 'dark' || storedTheme === 'light') {
+            setTheme(storedTheme);
+            return;
+        }
+
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setTheme(prefersDark ? 'dark' : 'light');
+    }, []);
+
+    useEffect(() => {
+        const root = document.documentElement;
+        if (theme === 'dark') {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
+    const toggleTheme = () => {
+        setTheme((prevTheme) => (prevTheme === 'dark' ? 'light' : 'dark'));
+    };
+
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-            <header className="bg-ieee-navy text-white shadow-md sticky top-0 z-50 px-4 py-3">
+        <div className="min-h-screen bg-slate-50 flex flex-col font-sans transition-colors duration-200">
+            <header className="bg-ieee-navy text-white shadow-md sticky top-0 z-50 px-4 py-3 transition-colors duration-200">
                 <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
                     <Link to="/" className="flex items-center gap-4 hover:opacity-90 transition-opacity">
                         <div className="text-ieee-blue font-black text-2xl tracking-tight bg-white p-2 rounded shadow-sm">
@@ -17,13 +44,26 @@ export default function Layout({ children }) {
                         </div>
                     </Link>
 
-                    <nav className="flex items-center gap-1 md:gap-4 overflow-x-auto pb-1 md:pb-0">
+                    <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-0">
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-100 transition-colors"
+                            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                        >
+                            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                            <span className="hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+                        </button>
+
+                        <nav className="flex items-center gap-1 md:gap-4">
                         <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Dashboard" />
                         <NavItem to="/opportunities" icon={<List size={20} />} label="Feed" />
                         <NavItem to="/directory" icon={<Users size={20} />} label="Directory" />
                         <NavItem to="/saved" icon={<Bookmark size={20} />} label="Saved" />
                         <NavItem to="/admin" icon={<Settings size={20} />} label="Admin" />
-                    </nav>
+                        </nav>
+                    </div>
                 </div>
             </header>
 
