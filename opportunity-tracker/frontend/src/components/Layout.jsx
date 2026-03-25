@@ -36,6 +36,12 @@ export default function Layout({ children }) {
         }
     }, []);
 
+    useEffect(() => {
+        const openPreferences = () => setShowPreferencesModal(true);
+        window.addEventListener('open-preferences-modal', openPreferences);
+        return () => window.removeEventListener('open-preferences-modal', openPreferences);
+    }, []);
+
     const handleSavePreferences = (nextPreferences) => {
         const saved = savePreferences(nextPreferences);
         setPreferences(saved);
