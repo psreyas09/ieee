@@ -46,10 +46,11 @@ export default function AdminLogin() {
                             type="text"
                             required
                             autoComplete="username"
-                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-ieee-blue focus:border-ieee-blue dark:focus:ring-blue-400 dark:focus:border-blue-400 outline-none transition-all"
+                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 caret-slate-900 dark:caret-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-ieee-blue focus:border-ieee-blue dark:focus:ring-blue-400 dark:focus:border-blue-400 outline-none transition-all appearance-none"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             placeholder="Enter your username"
+                            spellCheck={false}
                         />
                     </div>
                     <div>
@@ -60,7 +61,7 @@ export default function AdminLogin() {
                             type="password"
                             required
                             autoComplete="current-password"
-                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-ieee-blue focus:border-ieee-blue dark:focus:ring-blue-400 dark:focus:border-blue-400 outline-none transition-all"
+                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 caret-slate-900 dark:caret-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-ieee-blue focus:border-ieee-blue dark:focus:ring-blue-400 dark:focus:border-blue-400 outline-none transition-all appearance-none"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="Enter your password"
