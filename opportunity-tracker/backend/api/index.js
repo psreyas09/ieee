@@ -1173,6 +1173,19 @@ app.delete('/api/admin/opportunities/:id', authenticateAdmin, async (req, res) =
     }
 });
 
+app.post('/api/admin/opportunities/:id/verify', authenticateAdmin, async (req, res) => {
+    try {
+        const { verified } = req.body;
+        const opp = await prisma.opportunity.update({
+            where: { id: req.params.id },
+            data: { verified: Boolean(verified) }
+        });
+        res.json(opp);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/api/admin/organizations', authenticateAdmin, async (req, res) => {
     try {
         const { name, type, officialWebsite, scrapeUrl, scrapeUrls } = req.body;

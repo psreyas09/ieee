@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOrganization, createOrganization, addOrganizationScrapeUrl, deleteOrganizationScrapeUrl, getScrapeHealth, getDuplicateGroups, mergeDuplicates } from '../services/api';
+import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOrganization, createOrganization, addOrganizationScrapeUrl, deleteOrganizationScrapeUrl, getScrapeHealth, getDuplicateGroups, mergeDuplicates, verifyOpportunity } from '../services/api';
 import { Activity, Trash2, ExternalLink, RefreshCw, LogOut, PlusCircle, X, Pencil } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -315,6 +315,16 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleVerifyToggle = async (id, currentVerified) => {
+        try {
+            await verifyOpportunity(id, !currentVerified);
+            showToast(!currentVerified ? 'Opportunity marked as verified.' : 'Verification removed.');
+            fetchData();
+        } catch (error) {
+            showToast('Failed to update verification status.');
+        }
+    };
+
     const handleManageScrapeUrls = async (org) => {
         const currentUrls = getExplicitScrapeUrls(org);
         const nextValue = prompt(
@@ -615,6 +625,7 @@ export default function AdminDashboard() {
                                     <th className="py-3 px-4 font-semibold text-slate-700">Organization</th>
                                     <th className="py-3 px-4 font-semibold text-slate-700">Type</th>
                                     <th className="py-3 px-4 font-semibold text-slate-700">Status</th>
+                                    <th className="py-3 px-4 font-semibold text-slate-700">Verified</th>
                                     <th className="py-3 px-4 font-semibold text-slate-700">Actions</th>
                                 </tr>
                             </thead>
@@ -632,7 +643,27 @@ export default function AdminDashboard() {
                                             </span>
                                         </td>
                                         <td className="py-3 px-4">
+                                            {opp.verified ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                                                    ✓ Verified
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-400">Unverified</span>
+                                            )}
+                                        </td>
+                                        <td className="py-3 px-4">
                                             <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleVerifyToggle(opp.id, opp.verified)}
+                                                    className={`px-2.5 py-1.5 text-xs font-medium rounded transition-colors ${
+                                                        opp.verified
+                                                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                                                    }`}
+                                                    title={opp.verified ? 'Remove verification' : 'Mark as verified'}
+                                                >
+                                                    {opp.verified ? '✓Verify' : 'Verify'}
+                                                </button>
                                                 {opp.url && (
                                                     <a href={opp.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-ieee-blue bg-white rounded shadow-sm border border-slate-200">
                                                         <ExternalLink size={14} />
@@ -647,7 +678,7 @@ export default function AdminDashboard() {
                                 ))}
                                 {opps.length === 0 && (
                                     <tr>
-                                        <td colSpan="5" className="text-center py-8 text-slate-500">No opportunities found.</td>
+                                        <td colSpan="6" className="text-center py-8 text-slate-500">No opportunities found.</td>
                                     </tr>
                                 )}
                             </tbody>
