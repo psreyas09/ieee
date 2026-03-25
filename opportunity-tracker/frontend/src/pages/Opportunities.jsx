@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Filter } from 'lucide-react';
 import { getOpportunities, getOrganizations } from '../services/api';
 import OpportunityCard from '../components/OpportunityCard';
-import { deriveOpportunityDefaults, getStoredPreferences } from '../utils/preferences';
+import { deriveOpportunityDefaults, derivePreferredTypes, getStoredPreferences } from '../utils/preferences';
 
 export default function Opportunities() {
-    const initialDefaultsRef = useRef(deriveOpportunityDefaults(getStoredPreferences()));
+    const initialPreferences = getStoredPreferences();
+    const initialDefaultsRef = useRef(deriveOpportunityDefaults(initialPreferences));
+    const initialPreferredTypesRef = useRef(derivePreferredTypes(initialPreferences));
     const [opportunities, setOpportunities] = useState([]);
     const [orgs, setOrgs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -19,22 +21,29 @@ export default function Opportunities() {
     const [orgId, setOrgId] = useState('');
     const [type, setType] = useState(initialDefaultsRef.current.type);
     const [status, setStatus] = useState(initialDefaultsRef.current.status);
+    const [basePreferredTypes, setBasePreferredTypes] = useState(initialPreferredTypesRef.current);
 
     const fetchOpps = async (pageNum = 1, isLoadMore = false) => {
         if (!isLoadMore) setLoading(true);
         else setLoadingMore(true);
 
         try {
-            const data = await getOpportunities({ search, organizationId: orgId, type, status, limit: 50, page: pageNum });
+            const effectiveType = type || '';
+            const data = await getOpportunities({ search, organizationId: orgId, type: effectiveType, status, limit: 50, page: pageNum });
+
+            const shouldApplyBaseTypeFilter = !effectiveType && basePreferredTypes.length > 0;
+            const filteredData = shouldApplyBaseTypeFilter
+                ? data.data.filter((item) => basePreferredTypes.includes(item.type))
+                : data.data;
 
             if (isLoadMore) {
                 setOpportunities(prev => {
                     const existingIds = new Set(prev.map(p => p.id));
-                    const newItems = data.data.filter(d => !existingIds.has(d.id));
+                    const newItems = filteredData.filter(d => !existingIds.has(d.id));
                     return [...prev, ...newItems];
                 });
             } else {
-                setOpportunities(data.data);
+                setOpportunities(filteredData);
             }
 
             setHasMore(pageNum < (data.pagination?.totalPages || 1));
@@ -63,13 +72,16 @@ export default function Opportunities() {
             fetchOpps(1, false);
         }, 350);
         return () => clearTimeout(delay);
-    }, [search, orgId, type, status]);
+    }, [search, orgId, type, status, basePreferredTypes]);
 
     useEffect(() => {
         const applyUpdatedPreferences = () => {
-            const defaults = deriveOpportunityDefaults(getStoredPreferences());
+            const stored = getStoredPreferences();
+            const defaults = deriveOpportunityDefaults(stored);
+            const preferredTypes = derivePreferredTypes(stored);
             setType(defaults.type);
             setStatus(defaults.status);
+            setBasePreferredTypes(preferredTypes);
             setSearch('');
             setOrgId('');
         };
