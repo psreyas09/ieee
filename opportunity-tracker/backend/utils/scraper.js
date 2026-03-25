@@ -153,6 +153,64 @@ function scoreLink(urlString) {
     return score;
 }
 
+function extractLowSignalText($, pageUrl) {
+    const metaPieces = [
+        $('title').text(),
+        $('meta[name="description"]').attr('content'),
+        $('meta[property="og:title"]').attr('content'),
+        $('meta[property="og:description"]').attr('content')
+    ].filter(Boolean);
+
+    const headingText = $('h1, h2, h3')
+        .map((_, el) => $(el).text().trim())
+        .get()
+        .filter(Boolean)
+        .slice(0, 40)
+        .join(' ');
+
+    const accessibilityText = $('[aria-label], [title], img[alt]')
+        .map((_, el) => $(el).attr('aria-label') || $(el).attr('title') || $(el).attr('alt') || '')
+        .get()
+        .map(value => String(value).trim())
+        .filter(Boolean)
+        .slice(0, 80)
+        .join(' ');
+
+    const linkSlugText = $('a[href]')
+        .map((_, el) => $(el).attr('href'))
+        .get()
+        .map((href) => {
+            try {
+                const url = new URL(String(href).trim(), pageUrl);
+                return url.pathname
+                    .split(/[\/_-]+/)
+                    .map(token => token.trim())
+                    .filter(token => token.length >= 3)
+                    .join(' ');
+            } catch {
+                return '';
+            }
+        })
+        .filter(Boolean)
+        .slice(0, 120)
+        .join(' ');
+
+    const pageSignal = (() => {
+        try {
+            const parsed = new URL(pageUrl);
+            return `${parsed.hostname} ${parsed.pathname}`;
+        } catch {
+            return String(pageUrl || '');
+        }
+    })();
+
+    return [metaPieces.join(' '), headingText, accessibilityText, linkSlugText, pageSignal]
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 async function fetchAndExtractText(url) {
     try {
         const { data } = await axios.get(url, {
@@ -182,28 +240,14 @@ async function fetchAndExtractText(url) {
 
         if (extractedText.length < 120) {
             // JS-heavy sites may expose little body text in static HTML.
-            // Use metadata + anchor text as a secondary signal instead of hard-failing.
-            const metaPieces = [
-                $('title').text(),
-                $('meta[name="description"]').attr('content'),
-                $('meta[property="og:title"]').attr('content'),
-                $('meta[property="og:description"]').attr('content')
-            ].filter(Boolean);
-
-            const linkText = $('a')
-                .map((_, el) => $(el).text().trim())
-                .get()
-                .filter(Boolean)
-                .slice(0, 200)
-                .join(' ');
-
-            const fallbackText = `${metaPieces.join(' ')} ${linkText}`.replace(/\s+/g, ' ').trim();
+            // Use metadata/headers/accessibility/link-slug signals as a secondary source.
+            const fallbackText = extractLowSignalText($, url);
             if (fallbackText.length > extractedText.length) {
                 extractedText = fallbackText;
             }
         }
 
-        if (extractedText.length < 20) {
+        if (extractedText.length < 8) {
             throw new Error('Page returned almost no readable text (likely JS-rendered or blocked). Try a deeper content URL.');
         }
 
@@ -266,21 +310,7 @@ function extractVisibleTextAndLinks(rawHtml, pageUrl) {
     let text = $('body').text().replace(/\s+/g, ' ').trim();
 
     if (text.length < 120) {
-        const metaPieces = [
-            $('title').text(),
-            $('meta[name="description"]').attr('content'),
-            $('meta[property="og:title"]').attr('content'),
-            $('meta[property="og:description"]').attr('content')
-        ].filter(Boolean);
-
-        const linkText = $('a')
-            .map((_, el) => $(el).text().trim())
-            .get()
-            .filter(Boolean)
-            .slice(0, 200)
-            .join(' ');
-
-        const fallbackText = `${metaPieces.join(' ')} ${linkText}`.replace(/\s+/g, ' ').trim();
+        const fallbackText = extractLowSignalText($, pageUrl);
         if (fallbackText.length > text.length) {
             text = fallbackText;
         }
