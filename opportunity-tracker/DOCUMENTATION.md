@@ -145,6 +145,10 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 16. Directory redesigned as category navigation:
 	 - category cards, membership cards, region cards with live counts
 	 - card interactions navigate to feed with pre-applied quick filters
+17. Preference-aware dashboard summary cards:
+	 - `Total Tracked`, `Active Now`, `Closing This Week`, and `Organizations` are computed from opportunities that match saved preference-derived types
+	 - these counters update when preferences are changed via the header preferences modal
+	 - interest selections are normalized to valid opportunity types so Explore type checkboxes remain aligned with saved interests
 
 ## API Surface (Key Endpoints)
 

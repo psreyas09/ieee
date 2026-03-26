@@ -29,6 +29,9 @@ A full-stack web application designed for IEEE student members to discover compe
    - Backend `GET /api/opportunities` now supports `types` (CSV) for multi-type filtering
    - Keyword search now ignores background type-preference filters so exact matches are not hidden
 - Homepage `Closing Soon` now respects selected preferences and updates when preferences change.
+- Dashboard stat cards are now preference-aware:
+   - `Total Tracked`, `Active Now`, `Closing This Week`, and `Organizations` are computed from opportunities matching saved interests
+   - counts update immediately when preferences are changed from header `Preferences`
 - Directory redesigned into category-centric navigation:
    - category cards, membership cards, region cards with live counts
    - clicking cards navigates to feed with quick filters pre-applied
@@ -127,6 +130,12 @@ Onboarding and quick-navigation filters are stored in browser storage:
 
 These are intentionally client-side for privacy/simplicity and can be changed anytime from the app UI.
 
+### Preference-to-Filter Mapping Notes
+
+- Saved interests are normalized into valid opportunity filter types before applying feed filters.
+- One interest may map to multiple types (for example, mentorship-related interests can include Fellowship, Workshop, and Webinar).
+- This ensures type filter checkboxes in Explore reflect saved interests consistently.
+
 ## Project Structure
 This repository uses a monorepo structure configured for automated Vercel deployments.
 - `/frontend` - Contains the React app
@@ -159,8 +168,8 @@ ADMIN_PASSWORD_HASH="$2a$10$YourHashedPasswordHere..."
 
 **In `opportunity-tracker/frontend/.env`:**
 \`\`\`env
-# The URL for the backend API. 
-# During local development with Vite server running on port 5173 and backend on try 3000:
+# The URL for the backend API.
+# During local development with Vite server running on port 5173 and backend on port 3000:
 VITE_API_URL="http://localhost:3000/api" 
 \`\`\`
 
