@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Activity, TrendingUp, Users, AlertCircle } from 'lucide-react';
 import { getOpportunities } from '../services/api';
 import OpportunityCard from '../components/OpportunityCard';
-import HeroGlobe from '../components/HeroGlobe';
 import { derivePreferredTypes, getStoredPreferences } from '../utils/preferences';
+
+const HeroGlobe = lazy(() => import('../components/HeroGlobe'));
 
 export default function Dashboard() {
     const [stats, setStats] = useState(null);
@@ -12,6 +13,7 @@ export default function Dashboard() {
     const [statsLoading, setStatsLoading] = useState(true);
     const [urgentLoading, setUrgentLoading] = useState(true);
     const [preferences, setPreferences] = useState(getStoredPreferences());
+    const [showGlobe, setShowGlobe] = useState(false);
 
     useEffect(() => {
         const handlePreferencesUpdated = (event) => {
@@ -21,6 +23,26 @@ export default function Dashboard() {
         window.addEventListener('preferences-updated', handlePreferencesUpdated);
         return () => {
             window.removeEventListener('preferences-updated', handlePreferencesUpdated);
+        };
+    }, []);
+
+    useEffect(() => {
+        let timeoutId;
+        let idleId;
+
+        const enableGlobe = () => setShowGlobe(true);
+
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+            idleId = window.requestIdleCallback(enableGlobe, { timeout: 1200 });
+        } else {
+            timeoutId = setTimeout(enableGlobe, 350);
+        }
+
+        return () => {
+            if (idleId && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+                window.cancelIdleCallback(idleId);
+            }
+            if (timeoutId) clearTimeout(timeoutId);
         };
     }, []);
 
@@ -92,7 +114,7 @@ export default function Dashboard() {
         fetchData();
     }, [preferences]);
 
-    const showClosingSoon = urgentLoading || urgent.length > 0;
+    const showClosingSoon = !urgentLoading && urgent.length > 0;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -108,7 +130,13 @@ export default function Dashboard() {
                 </div>
 
                 <div className="hidden md:flex relative z-10 w-[400px] h-[400px] flex-shrink-0 items-center justify-center">
-                    <HeroGlobe />
+                    {showGlobe ? (
+                        <Suspense fallback={<div className="w-[400px] h-[400px]" />}>
+                            <HeroGlobe />
+                        </Suspense>
+                    ) : (
+                        <div className="w-[400px] h-[400px]" />
+                    )}
                 </div>
             </section>
 
@@ -153,7 +181,7 @@ function StatCard({ title, value, icon, color }) {
             </div>
             <div>
                 <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{title}</p>
-                <p className="text-3xl font-black text-slate-900">{value}</p>
+                <p className="text-3xl font-black text-slate-900 tabular-nums min-w-[4ch]">{value}</p>
             </div>
         </div>
     );

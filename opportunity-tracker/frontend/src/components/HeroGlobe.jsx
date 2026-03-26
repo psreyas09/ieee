@@ -7,14 +7,19 @@ export default function HeroGlobe() {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-        const numNodes = 60;
+        const isNarrowViewport = typeof window !== 'undefined' && window.innerWidth < 1280;
+        const numNodes = isNarrowViewport ? 44 : 52;
         const radius = 160;
         const focalLength = 350;
-        const rotationSpeedY = 0.002;
+        const rotationSpeedY = 0.0018;
+        const frameIntervalMs = 1000 / 30;
 
         let nodes = [];
         let highlightedCount = 0;
+        let lastFrameAt = 0;
+        let isPageHidden = typeof document !== 'undefined' ? document.hidden : false;
 
         // Generate points on a sphere
         for (let i = 0; i < numNodes; i++) {
@@ -49,7 +54,18 @@ export default function HeroGlobe() {
         let angleY = 0;
         let animationFrameId;
 
-        const render = () => {
+        const render = (timestamp) => {
+            if (isPageHidden) {
+                animationFrameId = requestAnimationFrame(render);
+                return;
+            }
+
+            if (timestamp - lastFrameAt < frameIntervalMs) {
+                animationFrameId = requestAnimationFrame(render);
+                return;
+            }
+
+            lastFrameAt = timestamp;
             angleY += rotationSpeedY;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -95,10 +111,10 @@ export default function HeroGlobe() {
                     const dz = n1.rotatedZ - n2.rotatedZ;
                     const dist3D = Math.sqrt(dx * dx + dy * dy + dz * dz) * radius;
 
-                    if (dist3D < 110) {
-                        const alpha = 1 - (dist3D / 110);
+                    if (dist3D < 100) {
+                        const alpha = 1 - (dist3D / 100);
                         const zAlpha = (n1.alpha + n2.alpha) / 2;
-                        ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 * alpha * zAlpha})`;
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${0.16 * alpha * zAlpha})`;
                         ctx.beginPath();
                         ctx.moveTo(n1.screenX, n1.screenY);
                         ctx.lineTo(n2.screenX, n2.screenY);
@@ -109,7 +125,7 @@ export default function HeroGlobe() {
 
             // Draw nodes
             transformedNodes.sort((a, b) => b.rotatedZ - a.rotatedZ).forEach(node => {
-                const pulse = Math.sin(Date.now() / 400 + node.pulsePhase) * 0.2 + 0.8;
+                const pulse = Math.sin(timestamp / 450 + node.pulsePhase) * 0.2 + 0.8;
 
                 ctx.beginPath();
                 ctx.arc(node.screenX, node.screenY, (node.isHighlighted ? 2.5 : 1.5) * node.scale * pulse, 0, Math.PI * 2);
@@ -129,10 +145,17 @@ export default function HeroGlobe() {
             animationFrameId = requestAnimationFrame(render);
         };
 
+        const handleVisibilityChange = () => {
+            isPageHidden = document.hidden;
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
         render();
 
         return () => {
             cancelAnimationFrame(animationFrameId);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
 
