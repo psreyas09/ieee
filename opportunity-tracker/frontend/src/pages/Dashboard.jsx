@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Activity, TrendingUp, Users, AlertCircle } from 'lucide-react';
-import { getStats, getOpportunities } from '../services/api';
+import { getOpportunities } from '../services/api';
 import OpportunityCard from '../components/OpportunityCard';
 import HeroGlobe from '../components/HeroGlobe';
 import { derivePreferredTypes, getStoredPreferences } from '../utils/preferences';
@@ -29,24 +29,56 @@ export default function Dashboard() {
             setStatsLoading(true);
             setUrgentLoading(true);
             try {
-                const [statsData, urgentData] = await Promise.all([
-                    getStats(),
-                    getOpportunities({ status: 'Live', limit: 100 })
-                ]);
-                setStats(statsData);
+                const preferredTypes = derivePreferredTypes(preferences);
+                const selectedTypes = preferredTypes.length > 0 ? preferredTypes.join(',') : '';
 
-                const preferredTypes = new Set(derivePreferredTypes(preferences));
+                const firstPage = await getOpportunities({
+                    status: '',
+                    types: selectedTypes,
+                    limit: 200,
+                    page: 1
+                });
+
+                const totalPages = firstPage?.pagination?.totalPages || 1;
+                const pageRequests = [];
+                for (let page = 2; page <= totalPages; page += 1) {
+                    pageRequests.push(
+                        getOpportunities({
+                            status: '',
+                            types: selectedTypes,
+                            limit: 200,
+                            page
+                        })
+                    );
+                }
+
+                const remainingPages = pageRequests.length > 0 ? await Promise.all(pageRequests) : [];
+                const allOpportunities = [
+                    ...(firstPage?.data || []),
+                    ...remainingPages.flatMap((result) => result?.data || [])
+                ];
+
+                const liveOpportunities = allOpportunities.filter((opp) => opp.status === 'Live');
+                const organizationsCovered = new Set(
+                    allOpportunities.map((opp) => opp.organizationId).filter(Boolean)
+                ).size;
 
                 const now = new Date();
                 const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
                 const endOfWindow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59, 59, 999);
 
                 // Filter locally using day boundaries to match backend stats.
-                const filteredUrgent = urgentData.data.filter(opp => {
+                const filteredUrgent = liveOpportunities.filter((opp) => {
                     if (!opp.deadline) return false;
-                    if (preferredTypes.size > 0 && !preferredTypes.has(opp.type)) return false;
                     const deadline = new Date(opp.deadline);
                     return deadline >= startOfToday && deadline <= endOfWindow;
+                });
+
+                setStats({
+                    totalOpportunities: allOpportunities.length,
+                    activeOpportunities: liveOpportunities.length,
+                    closingSoon: filteredUrgent.length,
+                    societiesCovered: organizationsCovered
                 });
 
                 setUrgent(filteredUrgent.slice(0, 9));
