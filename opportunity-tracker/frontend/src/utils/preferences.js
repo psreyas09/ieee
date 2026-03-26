@@ -1,13 +1,45 @@
 const PREFERENCES_STORAGE_KEY = 'ieee.preferences.v1';
 
-const INTEREST_TO_TYPE = {
-    competition: 'Competition',
-    grant: 'Grant',
-    scholarship: 'Scholarship',
-    mentorship: 'Fellowship',
-    award: 'Other',
-    projectfunding: 'Grant',
-    other: 'Other'
+const OPPORTUNITY_TYPES = [
+    'Competition',
+    'Paper Contest',
+    'Grant',
+    'Hackathon',
+    'Fellowship',
+    'Workshop',
+    'Webinar',
+    'Other'
+];
+
+const INTEREST_TO_TYPES = {
+    competition: ['Competition', 'Paper Contest', 'Hackathon'],
+    grant: ['Grant'],
+    scholarship: ['Fellowship', 'Grant'],
+    mentorship: ['Fellowship', 'Workshop', 'Webinar'],
+    award: ['Other'],
+    projectfunding: ['Grant'],
+    other: ['Other']
+};
+
+const TYPE_LOOKUP = OPPORTUNITY_TYPES.reduce((acc, type) => {
+    acc[type.toLowerCase()] = type;
+    return acc;
+}, {});
+
+const normalizeType = (value) => {
+    const key = String(value || '').trim().toLowerCase();
+    return TYPE_LOOKUP[key] || '';
+};
+
+const mapInterestToTypes = (interest) => {
+    const key = String(interest || '').trim().toLowerCase();
+    const mapped = INTEREST_TO_TYPES[key];
+    if (Array.isArray(mapped) && mapped.length > 0) {
+        return mapped;
+    }
+
+    const asDirectType = normalizeType(interest);
+    return asDirectType ? [asDirectType] : [];
 };
 
 const normalizeArray = (value) => {
@@ -64,7 +96,7 @@ export const deriveOpportunityDefaults = (preferences) => {
 
     let mappedType = '';
     for (const interest of prefs.interests || []) {
-        const candidate = INTEREST_TO_TYPE[String(interest).toLowerCase()];
+        const candidate = mapInterestToTypes(interest)[0];
         if (candidate) {
             mappedType = candidate;
             break;
@@ -82,7 +114,7 @@ export const derivePreferredTypes = (preferences) => {
     if (!prefs) return [];
 
     const mapped = (prefs.interests || [])
-        .map((interest) => INTEREST_TO_TYPE[String(interest).toLowerCase()])
+        .flatMap((interest) => mapInterestToTypes(interest))
         .filter(Boolean);
 
     return [...new Set(mapped)];
