@@ -15,6 +15,27 @@ A full-stack web application designed for IEEE student members to discover compe
 - Persistence provider: Prisma ORM writing to Neon PostgreSQL.
 
 ## Recent Feature Updates
+- Opportunity verification workflow shipped end-to-end:
+   - Admin can toggle verification per opportunity (`Verify` action in Admin table)
+   - Verified badge/checkmark is shown on cards, detail pages, and overview/feed cards
+   - New admin endpoint: `POST /api/admin/opportunities/:id/verify`
+- Personalization onboarding shipped (browser-storage based):
+   - One-time modal captures persona, region, and interests
+   - Preferences are stored locally in browser storage (no DB write)
+   - Preferences can be changed later from header `Preferences`
+   - Feed defaults are derived from saved preferences
+- Opportunities feed filtering upgraded:
+   - Type filter supports multi-select checkbox behavior
+   - Backend `GET /api/opportunities` now supports `types` (CSV) for multi-type filtering
+   - Keyword search now ignores background type-preference filters so exact matches are not hidden
+- Homepage `Closing Soon` now respects selected preferences and updates when preferences change.
+- Directory redesigned into category-centric navigation:
+   - category cards, membership cards, region cards with live counts
+   - clicking cards navigates to feed with quick filters pre-applied
+- Broad dark-mode/readability improvements across:
+   - admin dashboard tables/buttons/modals
+   - login form inputs
+   - opportunities feed/cards/detail pages
 - Scraper now supports **safe bounded subsection crawling** to improve opportunity discovery:
    - same-domain internal links only
    - configurable hard limits on pages/depth/links/text budget
@@ -79,6 +100,32 @@ Merge behavior:
 - merges best non-empty/newer fields into primary
 - deletes selected duplicate ids
 - disallows cross-organization merge by default
+
+### Admin Verification (JWT required)
+- `POST /api/admin/opportunities/:id/verify`
+
+Payload:
+- `{ verified: boolean }`
+
+Behavior:
+- toggles verification status for an opportunity
+- verification status is reflected in admin table and public UI badges
+
+## Feed Query Notes
+
+`GET /api/opportunities` supports both single-type and multi-type filtering:
+- `type=Grant` (single type)
+- `types=Competition,Grant,Fellowship` (multi-select type filter)
+
+When keyword search is used in the feed UI, type preference defaults are not forced so exact text matches remain discoverable.
+
+## Client-Side Preference Storage
+
+Onboarding and quick-navigation filters are stored in browser storage:
+- `ieee.preferences.v1` -> onboarding profile/preferences
+- `ieee.quickFilters.v1` -> one-time handoff filters from Directory to Feed
+
+These are intentionally client-side for privacy/simplicity and can be changed anytime from the app UI.
 
 ## Project Structure
 This repository uses a monorepo structure configured for automated Vercel deployments.

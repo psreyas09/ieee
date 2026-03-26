@@ -129,6 +129,22 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 12. Region restriction visibility:
 	 - cards and detail pages show `Region Restricted`/`<Place> Only` badges when eligibility text clearly ties participants to a country or region
 	 - generic wording without concrete geography is intentionally not flagged
+13. Verification lifecycle:
+	 - admin can toggle opportunity verification state from dashboard table
+	 - verified badge appears in admin + public cards/detail views
+	 - endpoint added: `POST /api/admin/opportunities/:id/verify`
+14. Preference-driven personalization (client-side):
+	 - first-run onboarding captures persona, region, and interests
+	 - preferences are stored locally in browser storage (no DB persistence)
+	 - preferences can be reopened/edited via header action
+	 - homepage and feed now adapt defaults from saved preferences
+15. Feed filtering upgrades:
+	 - type filtering supports true multi-select behavior
+	 - backend opportunities API supports CSV `types` query param
+	 - text search ignores background type-preference constraints so exact matches are discoverable
+16. Directory redesigned as category navigation:
+	 - category cards, membership cards, region cards with live counts
+	 - card interactions navigate to feed with pre-applied quick filters
 
 ## API Surface (Key Endpoints)
 
@@ -137,6 +153,10 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - `GET /api/organizations`
 - `GET /api/opportunities`
 - `GET /api/opportunities/:id`
+
+`GET /api/opportunities` query support includes:
+- `type=<singleType>` for single type filtering
+- `types=<csv>` for multi-type filtering (example: `types=Competition,Grant,Fellowship`)
 
 ### Admin (JWT required)
 - `POST /api/admin/login`
@@ -148,6 +168,7 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - `POST /api/admin/opportunities`
 - `PUT /api/admin/opportunities/:id`
 - `DELETE /api/admin/opportunities/:id`
+- `POST /api/admin/opportunities/:id/verify`
 - `POST /api/admin/organizations`
 - `PUT /api/admin/organizations/:id`
 - `POST /api/admin/organizations/:id/scrape-urls`
@@ -184,6 +205,12 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - Keep `frontend/dist` untracked in git to avoid stale static assets overriding fresh builds
 
 ## Operations Runbook
+
+### Client preference storage keys
+- `ieee.preferences.v1`: onboarding preferences (persona, region, interests)
+- `ieee.quickFilters.v1`: one-shot filter handoff (Directory -> Opportunities)
+
+These keys are browser-local by design and are not synced to DB.
 
 ### Validate cron endpoint
 ```bash
