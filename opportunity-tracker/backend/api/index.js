@@ -660,6 +660,7 @@ app.post('/api/admin/login', async (req, res) => {
 app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
     try {
         const orgId = req.params.id;
+        const cooldownMs = 10 * 60 * 1000;
         const organization = await prisma.organization.findUnique({
             where: { id: orgId }
         });
@@ -668,9 +669,17 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
 
         // Check simple cooldown (10 minutes)
         if (organization.lastScrapedAt) {
-            const cooldownTime = new Date(Date.now() - 10 * 60 * 1000);
-            if (organization.lastScrapedAt > cooldownTime) {
-                return res.status(429).json({ error: 'Cooldown active. Try again later.' });
+            const elapsedMs = Date.now() - new Date(organization.lastScrapedAt).getTime();
+            if (elapsedMs < cooldownMs) {
+                const retryAfterSec = Math.max(1, Math.ceil((cooldownMs - elapsedMs) / 1000));
+                return res.status(429).json({
+                    error: 'Cooldown active. Try again later.',
+                    reason: 'cooldown',
+                    retryAfterSec,
+                    lastScrapedAt: organization.lastScrapedAt,
+                    organizationId: organization.id,
+                    organizationName: organization.name
+                });
             }
         }
 

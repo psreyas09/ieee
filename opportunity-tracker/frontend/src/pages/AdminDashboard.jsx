@@ -115,6 +115,36 @@ export default function AdminDashboard() {
         setTimeout(() => setToast(''), 5000);
     };
 
+    const formatScrapeFailureMessage = (error) => {
+        const status = error?.response?.status;
+        const payload = error?.response?.data || {};
+        const rawMessage = payload?.error || error?.message || 'Scrape failed.';
+        const lowered = String(rawMessage).toLowerCase();
+
+        if (status === 429 && (payload?.reason === 'cooldown' || lowered.includes('cooldown'))) {
+            const retryAfterSec = Number(payload?.retryAfterSec || 0);
+            if (retryAfterSec > 0) {
+                const minutes = Math.floor(retryAfterSec / 60);
+                const seconds = retryAfterSec % 60;
+                const waitLabel = minutes > 0
+                    ? `${minutes}m ${String(seconds).padStart(2, '0')}s`
+                    : `${seconds}s`;
+                return `Cooldown active for ${waitLabel}. Please wait, then retry.`;
+            }
+            return 'Cooldown active. Please wait before retrying this organization.';
+        }
+
+        if (status === 429) {
+            return `Rate limited: ${rawMessage}`;
+        }
+
+        if (lowered.includes('403 anti-bot') || lowered.includes('blocked the scraper') || lowered.includes('error 403')) {
+            return `${rawMessage} Add a direct public content URL in scrape URLs, or use manual entry.`;
+        }
+
+        return rawMessage;
+    };
+
     const filteredHealthRows = useMemo(() => {
         const rows = failedOnly
             ? scrapeHealthRows.filter(row => row.lastStatus === 'failed' || row.failed7d > 0)
@@ -262,7 +292,7 @@ export default function AdminDashboard() {
             showToast(`Success! Found ${result.opportunitiesFound} items, added ${result.newAdded} new.`);
             fetchData(); // refresh data
         } catch (error) {
-            const msg = error.response?.data?.error || error.message;
+            const msg = formatScrapeFailureMessage(error);
             showToast(`Failed: ${msg}`);
             // Log raw output if failed to parse
             if (error.response?.data?.raw) {
