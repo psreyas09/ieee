@@ -465,133 +465,60 @@ const buildPersonaRestrictionWhere = (persona) => {
     const normalizedPersona = String(persona || '').trim().toLowerCase();
     if (!normalizedPersona) return null;
 
-    const textFields = ['title', 'description', 'eligibility'];
-
-    const phraseFilter = (phrase) => ({
-        OR: textFields.map((field) => ({
-            [field]: { contains: phrase, mode: 'insensitive' }
-        }))
-    });
-
-    let exclusionPhrases = [];
+    // Build regex patterns for each persona
+    let regexPatterns = [];
 
     if (normalizedPersona === 'non-ieee member') {
-        exclusionPhrases = [
-            'ieee members only',
-            'only ieee members',
-            'must be ieee member',
-            'ieee membership required',
-            'ieee member required',
-            'exclusively for ieee',
-            'for ieee members only',
-            'available to ieee members',
-            'open to ieee members',
-            'restricted to ieee members',
-            'members of the ieee',
-            'ieee members',
-            'ieee member',
-            'ieee student members',
-            'ieee student member',
-            'student members',
-            'student member',
-            'ieee society members',
-            'members of ieee',
-            'ieee propagation',
-            'ieee antennas',
-            'ieee council',
-            'ieee technical committee',
-            'ieee chapter',
-            'ias members',
-            'pes members',
-            'pels members',
-            'cs members',
-            'ans members',
-            'sps members',
-            'mtt members',
-            'mga members',
-            'cis members',
-            'ras members',
-            'leos members',
-            'sscs members',
-            'vehicular technology society',
-            'reliability society',
-            'engineering management society',
-            'eta society',
-            'nuclear plasma sciences',
-            'electromagnetic compatibility',
-            'industrial electronics society'
+        regexPatterns = [
+            /\bieee\b.*\bmembers?\b/i,
+            /\bmembers?\b.*\bieee\b/i,
+            /\b(ias|pes|pels|sscs|cs|ans|sps|mtt|mga|cis|ras|leos|nps)\s+members?/i,
+            /\b(ias|pes|pels|sscs|cs|ans|sps|mtt|mga|cis|ras|leos)\b.*\bmembers?/i,
+            /student\s+members?/i,
+            /ieee\s+society\s+members?/i,
+            /exclusively?\s+for\s+(ieee|members)/i,
+            /open\s+to\s+(ieee|members)/i,
+            /available\s+to\s+(ieee|members)/i,
+            /restricted\s+to\s+(ieee|members)/i,
         ];
     } else if (normalizedPersona === 'young professional') {
         exclusionPhrases = [
             'students only',
-            'student members only',
-            'undergraduate students only',
-            'graduate students only',
-            'for undergraduate students only',
-            'for graduate students only',
-            'for students only',
-            'open to students',
-            'eligible for students',
-            'current students',
-            'enrolled students',
-            'bachelor students only',
-            'masters students only',
-            'phd students only',
-            'postgraduate students only',
-            'student programs',
-            'student competition',
-            'student award',
-            'student scholarship',
-            'student members',
-            'for students',
-            'student branch'
+        regexPatterns = [
+            /\bstudents?\s+only\b/i,
+            /\bstudent\s+members?/i,
+            /\b(undergraduate|graduate|bachelor|masters|phd|postgraduate)\s+students?/i,
+            /\bfor\s+(undergraduate|graduate|bachelor|masters|phd)\b/i,
+            /\bcurrent\s+students?\b/i,
+            /\benrolled\s+students?\b/i,
+            /\bstudent\s+(program|competition|award|scholarship|branch)/i,
         ];
     } else if (normalizedPersona === 'undergraduate student') {
-        exclusionPhrases = [
-            'graduate students only',
-            'postgraduate students only',
-            'masters students only',
-            'phd students only',
-            'young professionals only',
-            'professionals only',
-            'for graduates only',
-            'graduate programs',
-            'masters level',
-            'doctoral candidates',
-            'post-degree',
-            'graduate students',
-            'graduate award',
-            'graduate competition',
-            'graduate scholarship',
-            'masters program',
-            'phd program',
-            'postdoctoral'
+        regexPatterns = [
+            /\b(graduate|postgraduate|masters|phd|doctoral)\s+students?/i,
+            /\byoung\s+professionals?\s+(only)?\b/i,
+            /\bprofessionals?\s+only\b/i,
+            /\bfor\s+(graduates|masters|phd|postdoctoral)/i,
+            /\b(graduate|masters|doctoral)\s+(program|award|competition|scholarship)/i,
         ];
     } else if (normalizedPersona === 'graduate student') {
-        exclusionPhrases = [
-            'undergraduate students only',
-            'bachelor students only',
-            'undergraduates only',
-            'young professionals only',
-            'professionals only',
-            'for undergraduates only',
-            'for bachelors only',
-            'high school students',
-            'first year students',
-            'undergraduate students',
-            'undergraduate award',
-            'undergraduate competition',
-            'undergraduate scholarship',
-            'bachelor degree',
-            'bachelors program',
-            'undergraduate program'
+        regexPatterns = [
+            /\b(undergraduate|bachelor)\s+students?/i,
+            /\byoung\s+professionals?\s+only\b/i,
+            /\bprofessionals?\s+only\b/i,
+            /\bfor\s+(undergraduates|bachelors|high\s+school)/i,
+            /\b(undergraduate|bachelor)\s+(program|award|competition|scholarship)/i,
+            /\bhigh\s+school\b/i,
         ];
     }
 
-    if (exclusionPhrases.length === 0) return null;
+    if (regexPatterns.length === 0) return null;
 
+    // Return regex patterns in a special format for post-processing
     return {
-        NOT: exclusionPhrases.map((phrase) => phraseFilter(phrase))
+        _isRegexFilter: true,
+        _patterns: regexPatterns,
+        _persona: normalizedPersona
     };
 };
 
@@ -695,9 +622,8 @@ app.get('/api/opportunities', async (req, res) => {
         }
 
         const personaRestriction = buildPersonaRestrictionWhere(persona);
-        if (personaRestriction) {
-            where.AND = [...(where.AND || []), personaRestriction];
-        }
+        const hasRegexFilter = personaRestriction?._isRegexFilter;
+        const regexPatterns = personaRestriction?._patterns || [];
 
         const orderBy = sort === 'recent'
             ? [
@@ -729,13 +655,27 @@ app.get('/api/opportunities', async (req, res) => {
             prisma.opportunity.count({ where })
         ]);
 
+        // Apply regex-based persona filtering to results
+        let filteredOpportunities = opportunities;
+        if (hasRegexFilter && regexPatterns.length > 0) {
+            filteredOpportunities = opportunities.filter((opp) => {
+                const combinedText = [opp.title, opp.description, opp.eligibility]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+
+                // Exclude if ANY regex pattern matches
+                return !regexPatterns.some((pattern) => pattern.test(combinedText));
+            });
+        }
+
         res.json({
-            data: opportunities,
+            data: filteredOpportunities,
             pagination: {
-                total,
+                total: filteredOpportunities.length,
                 page: pageNum,
                 limit: limitNum,
-                totalPages: Math.ceil(total / limitNum)
+                totalPages: Math.ceil(filteredOpportunities.length / limitNum)
             }
         });
     } catch (error) {
