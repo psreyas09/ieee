@@ -503,6 +503,7 @@ const buildPersonaRestrictionWhere = (persona) => {
             'ieee chapter',
             'ias members',
             'pes members',
+            'pels members',
             'cs members',
             'ans members',
             'sps members',
