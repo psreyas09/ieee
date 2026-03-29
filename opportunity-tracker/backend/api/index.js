@@ -492,12 +492,29 @@ const buildPersonaRestrictionWhere = (persona) => {
             'ieee member',
             'ieee society members',
             'members of ieee',
-            'ieee ..society',
             'ieee propagation',
             'ieee antennas',
             'ieee council',
             'ieee technical committee',
-            'ieee chapter'
+            'ieee chapter',
+            'ias members',
+            'pes members',
+            'cs members',
+            'ans members',
+            'sps members',
+            'mtt members',
+            'mga members',
+            'cis members',
+            'ras members',
+            'leos members',
+            'sscs members',
+            'vehicular technology society',
+            'reliability society',
+            'engineering management society',
+            'eta society',
+            'nuclear plasma sciences',
+            'electromagnetic compatibility',
+            'industrial electronics society'
         ];
     } else if (normalizedPersona === 'young professional') {
         exclusionPhrases = [
