@@ -482,8 +482,6 @@ const buildPersonaRestrictionWhere = (persona) => {
             /restricted\s+to\s+(ieee|members)/i,
         ];
     } else if (normalizedPersona === 'young professional') {
-        exclusionPhrases = [
-            'students only',
         regexPatterns = [
             /\bstudents?\s+only\b/i,
             /\bstudent\s+members?/i,
