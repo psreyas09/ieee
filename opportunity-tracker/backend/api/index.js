@@ -634,6 +634,46 @@ app.get('/api/opportunities', async (req, res) => {
                 { id: 'asc' }
             ];
 
+        // For regex personas, fetch one page and filter it
+        // Note: Some pages may have fewer items if many are filtered out
+        if (hasRegexFilter && regexPatterns.length > 0) {
+            const opportunities = await prisma.opportunity.findMany({
+                where,
+                include: {
+                    organization: {
+                        select: {
+                            id: true,
+                            name: true,
+                            type: true
+                        }
+                    }
+                },
+                orderBy,
+                skip,
+                take: limitNum,
+            });
+
+            const filteredOpportunities = opportunities.filter((opp) => {
+                const combinedText = [opp.title, opp.description, opp.eligibility]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+                return !regexPatterns.some((pattern) => pattern.test(combinedText));
+            });
+
+            // Return filtered results without expensive count query
+            // Note: total is approximated; will be accurate if page is full
+            return res.json({
+                data: filteredOpportunities,
+                pagination: {
+                    total: filteredOpportunities.length + (skip || 0),
+                    page: pageNum,
+                    limit: limitNum,
+                    totalPages: 1 // Simplified, not ideal but prevents timeout
+                }
+            });
+        }
+
         const [opportunities, total] = await Promise.all([
             prisma.opportunity.findMany({
                 where,
@@ -653,27 +693,13 @@ app.get('/api/opportunities', async (req, res) => {
             prisma.opportunity.count({ where })
         ]);
 
-        // Apply regex-based persona filtering to results
-        let filteredOpportunities = opportunities;
-        if (hasRegexFilter && regexPatterns.length > 0) {
-            filteredOpportunities = opportunities.filter((opp) => {
-                const combinedText = [opp.title, opp.description, opp.eligibility]
-                    .filter(Boolean)
-                    .join(' ')
-                    .toLowerCase();
-
-                // Exclude if ANY regex pattern matches
-                return !regexPatterns.some((pattern) => pattern.test(combinedText));
-            });
-        }
-
         res.json({
-            data: filteredOpportunities,
+            data: opportunities,
             pagination: {
-                total: filteredOpportunities.length,
+                total,
                 page: pageNum,
                 limit: limitNum,
-                totalPages: Math.ceil(filteredOpportunities.length / limitNum)
+                totalPages: Math.ceil(total / limitNum)
             }
         });
     } catch (error) {
