@@ -486,7 +486,18 @@ const buildPersonaRestrictionWhere = (persona) => {
             'for ieee members only',
             'available to ieee members',
             'open to ieee members',
-            'restricted to ieee members'
+            'restricted to ieee members',
+            'members of the ieee',
+            'ieee members',
+            'ieee member',
+            'ieee society members',
+            'members of ieee',
+            'ieee ..society',
+            'ieee propagation',
+            'ieee antennas',
+            'ieee council',
+            'ieee technical committee',
+            'ieee chapter'
         ];
     } else if (normalizedPersona === 'young professional') {
         exclusionPhrases = [
@@ -505,7 +516,13 @@ const buildPersonaRestrictionWhere = (persona) => {
             'masters students only',
             'phd students only',
             'postgraduate students only',
-            'student programs'
+            'student programs',
+            'student competition',
+            'student award',
+            'student scholarship',
+            'student members',
+            'for students',
+            'student branch'
         ];
     } else if (normalizedPersona === 'undergraduate student') {
         exclusionPhrases = [
@@ -519,7 +536,14 @@ const buildPersonaRestrictionWhere = (persona) => {
             'graduate programs',
             'masters level',
             'doctoral candidates',
-            'post-degree'
+            'post-degree',
+            'graduate students',
+            'graduate award',
+            'graduate competition',
+            'graduate scholarship',
+            'masters program',
+            'phd program',
+            'postdoctoral'
         ];
     } else if (normalizedPersona === 'graduate student') {
         exclusionPhrases = [
@@ -531,7 +555,14 @@ const buildPersonaRestrictionWhere = (persona) => {
             'for undergraduates only',
             'for bachelors only',
             'high school students',
-            'first year students'
+            'first year students',
+            'undergraduate students',
+            'undergraduate award',
+            'undergraduate competition',
+            'undergraduate scholarship',
+            'bachelor degree',
+            'bachelors program',
+            'undergraduate program'
         ];
     }
 
