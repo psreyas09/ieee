@@ -634,11 +634,64 @@ app.get('/api/opportunities', async (req, res) => {
                 { id: 'asc' }
             ];
 
-        // For regex personas, fetch one page and filter it
-        // Note: Some pages may have fewer items if many are filtered out
+        // For regex personas, compute filtering before pagination so pages stay full/accurate.
         if (hasRegexFilter && regexPatterns.length > 0) {
-            const opportunities = await prisma.opportunity.findMany({
-                where,
+            const batchSize = 500;
+            let offset = 0;
+            let filteredCount = 0;
+            const pageIds = [];
+            const startIndex = skip;
+            const endIndexExclusive = skip + limitNum;
+
+            while (true) {
+                const batch = await prisma.opportunity.findMany({
+                    where,
+                    orderBy,
+                    skip: offset,
+                    take: batchSize,
+                    select: {
+                        id: true,
+                        title: true,
+                        description: true,
+                        eligibility: true,
+                    }
+                });
+
+                if (batch.length === 0) break;
+
+                for (const opp of batch) {
+                    const combinedText = [opp.title, opp.description, opp.eligibility]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase();
+
+                    const excluded = regexPatterns.some((pattern) => pattern.test(combinedText));
+                    if (excluded) continue;
+
+                    if (filteredCount >= startIndex && filteredCount < endIndexExclusive) {
+                        pageIds.push(opp.id);
+                    }
+                    filteredCount += 1;
+                }
+
+                offset += batch.length;
+                if (batch.length < batchSize) break;
+            }
+
+            if (pageIds.length === 0) {
+                return res.json({
+                    data: [],
+                    pagination: {
+                        total: filteredCount,
+                        page: pageNum,
+                        limit: limitNum,
+                        totalPages: Math.ceil(filteredCount / limitNum)
+                    }
+                });
+            }
+
+            const pageRows = await prisma.opportunity.findMany({
+                where: { id: { in: pageIds } },
                 include: {
                     organization: {
                         select: {
@@ -647,29 +700,19 @@ app.get('/api/opportunities', async (req, res) => {
                             type: true
                         }
                     }
-                },
-                orderBy,
-                skip,
-                take: limitNum,
+                }
             });
 
-            const filteredOpportunities = opportunities.filter((opp) => {
-                const combinedText = [opp.title, opp.description, opp.eligibility]
-                    .filter(Boolean)
-                    .join(' ')
-                    .toLowerCase();
-                return !regexPatterns.some((pattern) => pattern.test(combinedText));
-            });
+            const orderMap = new Map(pageIds.map((id, idx) => [id, idx]));
+            pageRows.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
 
-            // Return filtered results without expensive count query
-            // Note: total is approximated; will be accurate if page is full
             return res.json({
-                data: filteredOpportunities,
+                data: pageRows,
                 pagination: {
-                    total: filteredOpportunities.length + (skip || 0),
+                    total: filteredCount,
                     page: pageNum,
                     limit: limitNum,
-                    totalPages: 1 // Simplified, not ideal but prevents timeout
+                    totalPages: Math.ceil(filteredCount / limitNum)
                 }
             });
         }
