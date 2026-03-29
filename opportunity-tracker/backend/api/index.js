@@ -481,7 +481,12 @@ const buildPersonaRestrictionWhere = (persona) => {
             'only ieee members',
             'must be ieee member',
             'ieee membership required',
-            'ieee member required'
+            'ieee member required',
+            'exclusively for ieee',
+            'for ieee members only',
+            'available to ieee members',
+            'open to ieee members',
+            'restricted to ieee members'
         ];
     } else if (normalizedPersona === 'young professional') {
         exclusionPhrases = [
@@ -490,7 +495,17 @@ const buildPersonaRestrictionWhere = (persona) => {
             'undergraduate students only',
             'graduate students only',
             'for undergraduate students only',
-            'for graduate students only'
+            'for graduate students only',
+            'for students only',
+            'open to students',
+            'eligible for students',
+            'current students',
+            'enrolled students',
+            'bachelor students only',
+            'masters students only',
+            'phd students only',
+            'postgraduate students only',
+            'student programs'
         ];
     } else if (normalizedPersona === 'undergraduate student') {
         exclusionPhrases = [
@@ -498,13 +513,25 @@ const buildPersonaRestrictionWhere = (persona) => {
             'postgraduate students only',
             'masters students only',
             'phd students only',
-            'young professionals only'
+            'young professionals only',
+            'professionals only',
+            'for graduates only',
+            'graduate programs',
+            'masters level',
+            'doctoral candidates',
+            'post-degree'
         ];
     } else if (normalizedPersona === 'graduate student') {
         exclusionPhrases = [
             'undergraduate students only',
             'bachelor students only',
-            'young professionals only'
+            'undergraduates only',
+            'young professionals only',
+            'professionals only',
+            'for undergraduates only',
+            'for bachelors only',
+            'high school students',
+            'first year students'
         ];
     }
 
