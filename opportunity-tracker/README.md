@@ -32,6 +32,10 @@ A full-stack web application designed for IEEE student members to discover compe
 - Dashboard stat cards are now preference-aware:
    - `Total Tracked`, `Active Now`, `Closing This Week`, and `Organizations` are computed from opportunities matching saved interests
    - counts update immediately when preferences are changed from header `Preferences`
+- Persona eligibility filtering is now applied server-side in opportunities API:
+   - pass `persona` in `GET /api/opportunities` to exclude ineligible records before pagination
+   - example impact: `Non-IEEE Member` hides IEEE-members-only opportunities
+   - totals may appear lower after this change because exclusions are intentional
 - Directory redesigned into category-centric navigation:
    - category cards, membership cards, region cards with live counts
    - clicking cards navigates to feed with quick filters pre-applied
@@ -212,9 +216,11 @@ When deploying to Vercel, **you do not use `.env` files.** Instead, you must add
    For local schema iteration during development, `npx prisma migrate dev` is recommended.
 
 3. **Run Locally**
-   - Start Backend: `cd backend && npm run dev` (Runs on `localhost:3000`)
-   - Start Frontend: `cd frontend && npm run dev` (Runs on `localhost:5173`)
+   - Start Backend: `cd /home/sreyas/projects/ieee/opportunity-tracker/backend && npm run dev` (Runs on `localhost:3000`)
+   - Start Frontend: `cd /home/sreyas/projects/ieee/opportunity-tracker/frontend && npm run dev` (Runs on `localhost:5173`)
    *Note: Frontend vite.config.js automatically proxies `/api` to `localhost:3000`.*
+
+If you run `npm run dev` from `/home/sreyas/projects/ieee`, npm will fail with `ENOENT` because there is no `package.json` at that level.
 
 ## Deployment to Vercel
 

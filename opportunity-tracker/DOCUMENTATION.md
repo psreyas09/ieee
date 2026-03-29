@@ -149,6 +149,10 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 	 - `Total Tracked`, `Active Now`, `Closing This Week`, and `Organizations` are computed from opportunities that match saved preference-derived types
 	 - these counters update when preferences are changed via the header preferences modal
 	 - interest selections are normalized to valid opportunity types so Explore type checkboxes remain aligned with saved interests
+18. Persona eligibility filtering (server-side):
+	 - opportunities API now supports `persona` query and applies eligibility exclusion rules before pagination
+	 - this prevents ineligible opportunities (for example, IEEE-members-only items for `Non-IEEE Member`) from leaking into later pages
+	 - dashboard/feed totals can decrease after persona filtering because ineligible records are intentionally removed from result sets
 
 ## API Surface (Key Endpoints)
 
@@ -161,6 +165,7 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 `GET /api/opportunities` query support includes:
 - `type=<singleType>` for single type filtering
 - `types=<csv>` for multi-type filtering (example: `types=Competition,Grant,Fellowship`)
+- `persona=<personaLabel>` for eligibility-aware filtering (for example: `Non-IEEE Member`, `Undergraduate Student`, `Graduate Student`, `Young Professional`)
 
 ### Admin (JWT required)
 - `POST /api/admin/login`
@@ -228,6 +233,7 @@ Expected: JSON with `message` and `results`.
 - `401 Unauthorized CRON request`: bad/missing auth secret.
 - `500 CRON_SECRET is missing`: add env var and redeploy.
 - `Cannot GET /api/cron/scrape-batch`: old deployment or wrong project settings.
+- `npm error enoent ... /home/.../package.json`: command executed from wrong directory. Run backend commands from `opportunity-tracker/backend` and frontend commands from `opportunity-tracker/frontend`.
 
 ### Student Activities URL correction (one-time DB patch)
 ```sql
