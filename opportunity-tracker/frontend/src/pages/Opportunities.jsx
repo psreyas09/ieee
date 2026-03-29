@@ -8,6 +8,7 @@ export default function Opportunities() {
     const initialPreferences = getStoredPreferences();
     const initialDefaultsRef = useRef(deriveOpportunityDefaults(initialPreferences));
     const initialPreferredTypesRef = useRef(derivePreferredTypes(initialPreferences));
+    const [preferences, setPreferences] = useState(initialPreferences);
     const [opportunities, setOpportunities] = useState([]);
     const [orgs, setOrgs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -31,6 +32,7 @@ export default function Opportunities() {
             const data = await getOpportunities({
                 search,
                 organizationId: orgId,
+                persona: preferences?.persona || '',
                 // Search should span all types; otherwise preference defaults can hide exact matches.
                 types: hasSearch ? '' : (selectedTypes.length > 0 ? selectedTypes.join(',') : ''),
                 status,
@@ -92,13 +94,14 @@ export default function Opportunities() {
             fetchOpps(1, false);
         }, 350);
         return () => clearTimeout(delay);
-    }, [search, orgId, selectedTypes, status]);
+    }, [search, orgId, selectedTypes, status, preferences?.persona]);
 
     useEffect(() => {
         const applyUpdatedPreferences = () => {
             const stored = getStoredPreferences();
             const defaults = deriveOpportunityDefaults(stored);
             const preferredTypes = derivePreferredTypes(stored);
+            setPreferences(stored);
             setSelectedTypes(preferredTypes);
             setStatus(defaults.status);
             setSearch('');

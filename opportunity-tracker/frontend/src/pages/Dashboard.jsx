@@ -57,6 +57,7 @@ export default function Dashboard() {
                 const firstPage = await getOpportunities({
                     status: '',
                     types: selectedTypes,
+                    persona: preferences?.persona || '',
                     limit: 200,
                     page: 1
                 });
@@ -68,6 +69,7 @@ export default function Dashboard() {
                         getOpportunities({
                             status: '',
                             types: selectedTypes,
+                            persona: preferences?.persona || '',
                             limit: 200,
                             page
                         })

@@ -461,6 +461,60 @@ const buildScrapeHealthFallbackRow = (organization) => ({
     successRate: 0
 });
 
+const buildPersonaRestrictionWhere = (persona) => {
+    const normalizedPersona = String(persona || '').trim().toLowerCase();
+    if (!normalizedPersona) return null;
+
+    const textFields = ['title', 'description', 'eligibility'];
+
+    const phraseFilter = (phrase) => ({
+        OR: textFields.map((field) => ({
+            [field]: { contains: phrase, mode: 'insensitive' }
+        }))
+    });
+
+    let exclusionPhrases = [];
+
+    if (normalizedPersona === 'non-ieee member') {
+        exclusionPhrases = [
+            'ieee members only',
+            'only ieee members',
+            'must be ieee member',
+            'ieee membership required',
+            'ieee member required'
+        ];
+    } else if (normalizedPersona === 'young professional') {
+        exclusionPhrases = [
+            'students only',
+            'student members only',
+            'undergraduate students only',
+            'graduate students only',
+            'for undergraduate students only',
+            'for graduate students only'
+        ];
+    } else if (normalizedPersona === 'undergraduate student') {
+        exclusionPhrases = [
+            'graduate students only',
+            'postgraduate students only',
+            'masters students only',
+            'phd students only',
+            'young professionals only'
+        ];
+    } else if (normalizedPersona === 'graduate student') {
+        exclusionPhrases = [
+            'undergraduate students only',
+            'bachelor students only',
+            'young professionals only'
+        ];
+    }
+
+    if (exclusionPhrases.length === 0) return null;
+
+    return {
+        NOT: exclusionPhrases.map((phrase) => phraseFilter(phrase))
+    };
+};
+
 // --- Middleware ---
 const authenticateAdmin = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -535,7 +589,7 @@ app.get('/api/organizations', async (req, res) => {
 
 app.get('/api/opportunities', async (req, res) => {
     try {
-        const { organizationId, type, types, status, search, sort, page = 1, limit = 20 } = req.query;
+        const { organizationId, type, types, status, search, sort, persona, page = 1, limit = 20 } = req.query;
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
@@ -558,6 +612,11 @@ app.get('/api/opportunities', async (req, res) => {
                 { title: { contains: search, mode: 'insensitive' } },
                 { description: { contains: search, mode: 'insensitive' } },
             ];
+        }
+
+        const personaRestriction = buildPersonaRestrictionWhere(persona);
+        if (personaRestriction) {
+            where.AND = [...(where.AND || []), personaRestriction];
         }
 
         const orderBy = sort === 'recent'
