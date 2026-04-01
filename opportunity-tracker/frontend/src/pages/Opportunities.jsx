@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, Filter } from 'lucide-react';
 import { getOpportunities, getOrganizations } from '../services/api';
 import OpportunityCard from '../components/OpportunityCard';
 import { deriveOpportunityDefaults, derivePreferredTypes, getStoredPreferences } from '../utils/preferences';
+import { getCostInfo } from '../utils/costClassification';
 
 export default function Opportunities() {
     const initialPreferences = getStoredPreferences();
@@ -22,6 +23,7 @@ export default function Opportunities() {
     const [orgId, setOrgId] = useState('');
     const [selectedTypes, setSelectedTypes] = useState(initialPreferredTypesRef.current);
     const [status, setStatus] = useState(initialDefaultsRef.current.status);
+    const [costFilter, setCostFilter] = useState('');
 
     const fetchOpps = async (pageNum = 1, isLoadMore = false) => {
         if (!isLoadMore) setLoading(true);
@@ -125,7 +127,23 @@ export default function Opportunities() {
         setOrgId('');
         setSelectedTypes([]);
         setStatus('');
+        setCostFilter('');
     };
+
+    const filteredOpportunities = useMemo(() => {
+        if (!costFilter) return opportunities;
+
+        return opportunities.filter((opp) => {
+            const costInfo = getCostInfo(opp);
+            const label = (costInfo?.label || '').toLowerCase();
+
+            if (costFilter === 'free') return label.startsWith('free');
+            if (costFilter === 'paid') return label === 'paid';
+            if (costFilter === 'reimbursement') return label === 'reimbursement';
+            if (costFilter === 'mixed') return label === 'mixed';
+            return true;
+        });
+    }, [opportunities, costFilter]);
 
     const toggleType = (nextType) => {
         setSelectedTypes((prev) => {
@@ -143,7 +161,7 @@ export default function Opportunities() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 dark:border-slate-700 pb-6 mb-6">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Explore Benefits</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Showing {opportunities.length} opportunities based on current filters.</p>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Showing {filteredOpportunities.length} opportunities based on current filters.</p>
                 </div>
             </div>
 
@@ -227,6 +245,23 @@ export default function Opportunities() {
                                 <option value="Closed">Closed</option>
                             </select>
                         </div>
+
+                        <div>
+                            <label htmlFor="opportunity-cost" className="text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wide mb-2 block">Cost</label>
+                            <select
+                                id="opportunity-cost"
+                                name="cost"
+                                className="block w-full pl-3 pr-10 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-md focus:outline-none focus:ring-ieee-blue focus:border-ieee-blue text-sm"
+                                value={costFilter}
+                                onChange={(e) => setCostFilter(e.target.value)}
+                            >
+                                <option value="">All Costs</option>
+                                <option value="free">Free</option>
+                                <option value="paid">Paid</option>
+                                <option value="reimbursement">Reimbursement</option>
+                                <option value="mixed">Mixed</option>
+                            </select>
+                        </div>
                     </div>
                 </aside>
 
@@ -237,10 +272,10 @@ export default function Opportunities() {
                                 <div key={i} className="h-64 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse"></div>
                             ))}
                         </div>
-                    ) : opportunities.length > 0 ? (
+                    ) : filteredOpportunities.length > 0 ? (
                         <div className="space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                {opportunities.map(opp => <OpportunityCard key={opp.id} opportunity={opp} />)}
+                                {filteredOpportunities.map(opp => <OpportunityCard key={opp.id} opportunity={opp} />)}
                             </div>
 
                             {hasMore && (
