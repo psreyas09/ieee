@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getOpportunity } from '../services/api';
 import { ArrowLeft, Calendar, Building, Globe, CheckCircle } from 'lucide-react';
 import { getRegionRestriction } from '../utils/regionRestriction';
+import { getCostInfo } from '../utils/costClassification';
 
 export default function OpportunityDetail() {
     const { id } = useParams();
@@ -21,6 +22,17 @@ export default function OpportunityDetail() {
     if (error || !opp) return <div className="py-20 text-center text-red-500">{error}</div>;
 
     const regionRestriction = getRegionRestriction(opp);
+    const costInfo = getCostInfo(opp);
+
+    const getCostTone = (tone) => {
+        if (tone === 'free') {
+            return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700';
+        }
+        if (tone === 'paid') {
+            return 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700';
+        }
+        return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600';
+    };
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
@@ -33,6 +45,9 @@ export default function OpportunityDetail() {
                     <div className="flex flex-wrap gap-2 mb-4">
                         <span className="text-sm font-semibold px-3 py-1 rounded-full bg-ieee-blue/10 dark:bg-ieee-blue/20 text-ieee-blue dark:text-blue-300 border border-ieee-blue/20 dark:border-blue-700/40">
                             {opp.type}
+                        </span>
+                        <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${getCostTone(costInfo.tone)}`}>
+                            {costInfo.label}
                         </span>
                         <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${opp.status === 'Live' ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-700' : 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600'}`}>
                             {opp.status.toUpperCase()}

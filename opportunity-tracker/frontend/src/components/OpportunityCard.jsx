@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Clock, Bookmark, Building, ChevronRight, CheckCircle } from 'lucide-react';
 import { getRegionRestriction } from '../utils/regionRestriction';
+import { getCostInfo } from '../utils/costClassification';
 
 export default function OpportunityCard({ opportunity, onSaveToggle }) {
     const [saved, setSaved] = useState(false);
@@ -35,6 +36,17 @@ export default function OpportunityCard({ opportunity, onSaveToggle }) {
 
     const daysLeft = getDaysLeft(opportunity.deadline);
     const regionRestriction = getRegionRestriction(opportunity);
+    const costInfo = getCostInfo(opportunity);
+
+    const getCostTone = (tone) => {
+        if (tone === 'free') {
+            return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700';
+        }
+        if (tone === 'paid') {
+            return 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700';
+        }
+        return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600';
+    };
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -63,6 +75,9 @@ export default function OpportunityCard({ opportunity, onSaveToggle }) {
                         </span>
                         <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
                             {opportunity.type}
+                        </span>
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${getCostTone(costInfo.tone)}`}>
+                            {costInfo.label}
                         </span>
                         {opportunity.verified && (
                             <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700">
