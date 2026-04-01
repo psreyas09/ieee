@@ -56,9 +56,7 @@ const REIMBURSEMENT_PATTERNS = [
     /\btravel funding\b/i,
     /\btravel reimbourse\b/i,
     /\bfinancial assistance\b/i,
-    /\baward\b/i,
     /\bscholarship\b/i,
-    /\bfellowship\b/i,
     /\basset amount\b/i,
     /\bpay.*after\b/i,
     /\bsubmit.*receipt\b/i,
@@ -81,6 +79,29 @@ const REIMBURSEMENT_PATTERNS = [
     /\baccommodation provided\b/i,
 ];
 
+const FELLOWSHIP_FUNDING_PATTERNS = [
+    /\bfunded\s+fellowship\b/i,
+    /\bpaid\s+fellowship\b/i,
+    /\bfellowship\s+(stipend|allowance|grant|funding|support)\b/i,
+    /\bstipend\b/i,
+    /\bmonthly\s+stipend\b/i,
+    /\bhonorarium\b/i,
+    /\bresearch\s+allowance\b/i,
+];
+
+const MONETARY_AWARD_PATTERNS = [
+    /\bcash\s+award\b/i,
+    /\bcash\s+prize\b/i,
+    /\bmonetary\s+award\b/i,
+    /\bprize\s+money\b/i,
+    /\bstipend\b/i,
+    /\bhonorarium\b/i,
+    /\baward\s+amount\b/i,
+    /\baward\s+of\s+\$\s?\d+/i,
+    /\bup\s+to\s+\$\s?[\d,]+\b/i,
+    /\b\$\s?[\d,]+\b/i,
+];
+
 export function getCostInfo(opportunity) {
     const combinedText = [
         opportunity?.title,
@@ -96,11 +117,15 @@ export function getCostInfo(opportunity) {
 
     // Type-based inference (strong signal)
     const type = opportunity?.type?.toLowerCase() || '';
-    if (type.includes('grant') || type.includes('scholarship') || type.includes('fellowship') || type.includes('award')) {
+    if (type.includes('grant') || type.includes('scholarship')) {
         return { label: 'Reimbursement', tone: 'reimbursement', category: 'reimbursement' };
     }
 
     const isReimbursement = REIMBURSEMENT_PATTERNS.some((pattern) => pattern.test(combinedText));
+    const hasMonetaryAwardSignal = MONETARY_AWARD_PATTERNS.some((pattern) => pattern.test(combinedText));
+    const isAwardTypeWithMoney = type.includes('award') && hasMonetaryAwardSignal;
+    const isFellowshipTypeWithFunding = type.includes('fellowship')
+        && FELLOWSHIP_FUNDING_PATTERNS.some((pattern) => pattern.test(combinedText));
     const isPaid = PAID_PATTERNS.some((pattern) => pattern.test(combinedText));
     const isFree = FREE_PATTERNS.some((pattern) => pattern.test(combinedText));
 
@@ -126,8 +151,8 @@ export function getCostInfo(opportunity) {
 
     // Mixed scenarios first so they are not swallowed by single-category checks.
     if (isPaid && isFree) return { label: 'Mixed', tone: 'neutral', category: 'mixed' };
-    if (isPaid && isReimbursement) return { label: 'Paid (Reimbursable)', tone: 'paid', category: 'mixed' };
-    if (isFree && isReimbursement) return { label: 'Free + Reimbursement', tone: 'reimbursement', category: 'mixed' };
+    if (isPaid && (isReimbursement || isAwardTypeWithMoney || isFellowshipTypeWithFunding)) return { label: 'Paid (Reimbursable)', tone: 'paid', category: 'mixed' };
+    if (isFree && (isReimbursement || isAwardTypeWithMoney || isFellowshipTypeWithFunding)) return { label: 'Free + Reimbursement', tone: 'reimbursement', category: 'mixed' };
 
     if (isPaid) return { label: 'Paid', tone: 'paid', category: 'paid' };
 
@@ -139,7 +164,7 @@ export function getCostInfo(opportunity) {
         return { label: 'Free', tone: 'free', category: 'free' };
     }
 
-    if (isReimbursement) return { label: 'Reimbursement', tone: 'reimbursement', category: 'reimbursement' };
+    if (isReimbursement || isAwardTypeWithMoney || isFellowshipTypeWithFunding) return { label: 'Reimbursement', tone: 'reimbursement', category: 'reimbursement' };
 
     // If no cost language found but type suggests free activity
     if (type.includes('workshop') || type.includes('webinar') || type.includes('competition')) {
