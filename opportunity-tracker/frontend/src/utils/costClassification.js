@@ -99,11 +99,39 @@ export function getCostInfo(opportunity) {
     const isPaid = PAID_PATTERNS.some((pattern) => pattern.test(combinedText));
     const isFree = FREE_PATTERNS.some((pattern) => pattern.test(combinedText));
 
+    // Detect membership-gated offers and extract organization acronym
+    let memberType = null;
+    const membershipPatterns = [
+        /(?:for|to)\s+([A-Z]{2,})\s+(?:members|member)/i,  // IEEE SSCS Members → SSCS
+        /(?:for|to)\s+(IEEE\s+[A-Z\s]{2,}?)\s+members/i,   // IEEE SSCS Members → IEEE SSCS (first 2-3 words)
+        /(?:IEEE\s+)?([A-Z]+)\s+members?\b/i,              // SSCS members → SSCS
+    ];
+    
+    for (const pattern of membershipPatterns) {
+        const match = combinedText.match(pattern);
+        if (match) {
+            memberType = match[1].trim();
+            // If it's long, take just acronym
+            if (memberType.length > 12) {
+                memberType = memberType.split(/\s+/).map(w => w[0]).join('');
+            }
+            break;
+        }
+    }
+
     // Reimbursement takes priority (grant/funding should be labeled as such)
     if (isReimbursement && !isFree) return { label: 'Reimbursement', tone: 'reimbursement' };
     
     if (isPaid && !isFree) return { label: 'Paid', tone: 'paid' };
-    if (isFree && !isPaid) return { label: 'Free', tone: 'free' };
+    
+    if (isFree && !isPaid) {
+        // Add membership condition if detected
+        if (memberType && combinedText.toLowerCase().includes('member')) {
+            return { label: `Free (${memberType} Members)`, tone: 'free' };
+        }
+        return { label: 'Free', tone: 'free' };
+    }
+    
     if (isPaid && isFree) return { label: 'Mixed', tone: 'neutral' };
 
     // If no cost language found but type suggests free activity

@@ -79,8 +79,8 @@ export default function OpportunityCard({ opportunity, onSaveToggle }) {
                         <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
                             {opportunity.type}
                         </span>
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${getCostTone(costInfo.tone)}`}>
-                            {costInfo.label}
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${getCostTone(costInfo.tone)}`} title={costInfo.label}>
+                            {costInfo.label.length > 20 ? costInfo.label.substring(0, 17) + '...' : costInfo.label}
                         </span>
                         {opportunity.verified && (
                             <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700">
