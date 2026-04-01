@@ -31,13 +31,49 @@ export default function Opportunities() {
 
         try {
             const hasSearch = search.trim().length > 0;
-            const data = await getOpportunities({
+            const shouldExpandForCost = Boolean(costFilter) && !isLoadMore;
+            const baseParams = {
                 search,
                 organizationId: orgId,
                 persona: preferences?.persona || '',
                 // Search should span all types; otherwise preference defaults can hide exact matches.
                 types: hasSearch ? '' : (selectedTypes.length > 0 ? selectedTypes.join(',') : ''),
                 status,
+            };
+
+            if (shouldExpandForCost) {
+                const firstPage = await getOpportunities({
+                    ...baseParams,
+                    limit: 200,
+                    page: 1
+                });
+
+                const totalPages = firstPage?.pagination?.totalPages || 1;
+                const pageRequests = [];
+                for (let p = 2; p <= totalPages; p += 1) {
+                    pageRequests.push(
+                        getOpportunities({
+                            ...baseParams,
+                            limit: 200,
+                            page: p
+                        })
+                    );
+                }
+
+                const remainingPages = pageRequests.length > 0 ? await Promise.all(pageRequests) : [];
+                const allData = [
+                    ...(firstPage?.data || []),
+                    ...remainingPages.flatMap((result) => result?.data || [])
+                ];
+
+                setOpportunities(allData);
+                setHasMore(false);
+                setPage(1);
+                return;
+            }
+
+            const data = await getOpportunities({
+                ...baseParams,
                 limit: 50,
                 page: pageNum
             });
@@ -96,7 +132,7 @@ export default function Opportunities() {
             fetchOpps(1, false);
         }, 350);
         return () => clearTimeout(delay);
-    }, [search, orgId, selectedTypes, status, preferences?.persona]);
+    }, [search, orgId, selectedTypes, status, costFilter, preferences?.persona]);
 
     useEffect(() => {
         const applyUpdatedPreferences = () => {
@@ -117,7 +153,7 @@ export default function Opportunities() {
     }, []);
 
     const handleLoadMore = () => {
-        if (!loadingMore && hasMore) {
+        if (!loadingMore && hasMore && !costFilter) {
             fetchOpps(page + 1, true);
         }
     };
