@@ -25,6 +25,12 @@ const PAID_PATTERNS = [
     /\bdues\b/i,
     /\bcharges?\s+apply\b/i,
     /\bpayable\b/i,
+    /\bpay\s+upfront\b/i,
+    /\bout\s+of\s+pocket\b/i,
+    /\byou\s+must\s+pay\b/i,
+    /\bbook\s+and\s+pay\b/i,
+    /\bproof\s+of\s+registration\b/i,
+    /\bregistration\s+at\s+the\s+(full|student)\s+rate\b/i,
 ];
 
 const FREE_PATTERNS = [
@@ -42,6 +48,9 @@ const FREE_PATTERNS = [
     /\bwaiver\b/i,
     /\bno charge\b/i,
     /\bfree admission\b/i,
+    /\bregistration\s+waiver\b/i,
+    /\bfee\s+waiver\b/i,
+    /\bwaived\s+registration\b/i,
 ];
 
 const REIMBURSEMENT_PATTERNS = [
@@ -77,6 +86,18 @@ const REIMBURSEMENT_PATTERNS = [
     /\beconomy airfare\b/i,
     /\bflight covered\b/i,
     /\baccommodation provided\b/i,
+    /\breimbursement\s+model\b/i,
+    /\breimburse\s+later\b/i,
+    /\bafter[-\s]?the[-\s]?fact\b/i,
+    /\bpay\s+first\s+and\s+get\s+reimbursed\b/i,
+    /\bonce\s+travel\s+is\s+completed\b/i,
+    /\battendance\s+is\s+verified\b/i,
+    /\bsubmit\s+the\s+receipt\s+immediately\b/i,
+    /\bearly\s+airfare\s+reimbursement\b/i,
+    /\bexpense\s+is\s+reimbursed\b/i,
+    /\bpay\s+for\s+your\s+own\s+(economy[-\s]?class\s+)?tickets\b/i,
+    /\bvisa\s+fees?\b/i,
+    /\blocal\s+transit\b/i,
 ];
 
 const FELLOWSHIP_FUNDING_PATTERNS = [
