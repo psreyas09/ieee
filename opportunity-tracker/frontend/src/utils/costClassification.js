@@ -20,6 +20,11 @@ const PAID_PATTERNS = [
     /\bpay\s+to\s+(attend|participate|enter)/i,
     /\bcost\s+is\s+\$/i,
     /\bprice\s+is\s+\$/i,
+    /\bregistration\s+(cost|charge|charges|required)\b/i,
+    /\bregistration\s+opens\s+with\s+fee\b/i,
+    /\bdues\b/i,
+    /\bcharges?\s+apply\b/i,
+    /\bpayable\b/i,
 ];
 
 const FREE_PATTERNS = [
@@ -86,13 +91,13 @@ export function getCostInfo(opportunity) {
         .join(' ');
 
     if (!combinedText && !opportunity?.type) {
-        return { label: 'Unspecified', tone: 'neutral' };
+        return { label: 'Unspecified', tone: 'neutral', category: 'unspecified' };
     }
 
     // Type-based inference (strong signal)
     const type = opportunity?.type?.toLowerCase() || '';
     if (type.includes('grant') || type.includes('scholarship') || type.includes('fellowship') || type.includes('award')) {
-        return { label: 'Reimbursement', tone: 'reimbursement' };
+        return { label: 'Reimbursement', tone: 'reimbursement', category: 'reimbursement' };
     }
 
     const isReimbursement = REIMBURSEMENT_PATTERNS.some((pattern) => pattern.test(combinedText));
@@ -119,25 +124,27 @@ export function getCostInfo(opportunity) {
         }
     }
 
-    // Reimbursement takes priority (grant/funding should be labeled as such)
-    if (isReimbursement && !isFree) return { label: 'Reimbursement', tone: 'reimbursement' };
-    
-    if (isPaid && !isFree) return { label: 'Paid', tone: 'paid' };
-    
-    if (isFree && !isPaid) {
+    // Mixed scenarios first so they are not swallowed by single-category checks.
+    if (isPaid && isFree) return { label: 'Mixed', tone: 'neutral', category: 'mixed' };
+    if (isPaid && isReimbursement) return { label: 'Paid (Reimbursable)', tone: 'paid', category: 'mixed' };
+    if (isFree && isReimbursement) return { label: 'Free + Reimbursement', tone: 'reimbursement', category: 'mixed' };
+
+    if (isPaid) return { label: 'Paid', tone: 'paid', category: 'paid' };
+
+    if (isFree) {
         // Add membership condition if detected
         if (memberType && combinedText.toLowerCase().includes('member')) {
-            return { label: `Free (${memberType} Members)`, tone: 'free' };
+            return { label: `Free (${memberType} Members)`, tone: 'free', category: 'free' };
         }
-        return { label: 'Free', tone: 'free' };
+        return { label: 'Free', tone: 'free', category: 'free' };
     }
-    
-    if (isPaid && isFree) return { label: 'Mixed', tone: 'neutral' };
+
+    if (isReimbursement) return { label: 'Reimbursement', tone: 'reimbursement', category: 'reimbursement' };
 
     // If no cost language found but type suggests free activity
     if (type.includes('workshop') || type.includes('webinar') || type.includes('competition')) {
-        return { label: 'Unspecified', tone: 'neutral' }; // Could be either
+        return { label: 'Unspecified', tone: 'neutral', category: 'unspecified' }; // Could be either
     }
 
-    return { label: 'Unspecified', tone: 'neutral' };
+    return { label: 'Unspecified', tone: 'neutral', category: 'unspecified' };
 }

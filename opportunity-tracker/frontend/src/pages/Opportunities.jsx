@@ -171,12 +171,12 @@ export default function Opportunities() {
 
         return opportunities.filter((opp) => {
             const costInfo = getCostInfo(opp);
-            const label = (costInfo?.label || '').toLowerCase();
+            const category = costInfo?.category || 'unspecified';
 
-            if (costFilter === 'free') return label.startsWith('free');
-            if (costFilter === 'paid') return label === 'paid';
-            if (costFilter === 'reimbursement') return label === 'reimbursement';
-            if (costFilter === 'mixed') return label === 'mixed';
+            if (costFilter === 'free') return category === 'free';
+            if (costFilter === 'paid') return category === 'paid';
+            if (costFilter === 'reimbursement') return category === 'reimbursement';
+            if (costFilter === 'mixed') return category === 'mixed';
             return true;
         });
     }, [opportunities, costFilter]);
