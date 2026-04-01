@@ -49,9 +49,11 @@ export default function OpportunityDetail() {
                         <span className="text-sm font-semibold px-3 py-1 rounded-full bg-ieee-blue/10 dark:bg-ieee-blue/20 text-ieee-blue dark:text-blue-300 border border-ieee-blue/20 dark:border-blue-700/40">
                             {opp.type}
                         </span>
-                        <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${getCostTone(costInfo.tone)}`} title={costInfo.label}>
-                            {costInfo.label.length > 25 ? costInfo.label.substring(0, 22) + '...' : costInfo.label}
-                        </span>
+                        {costInfo.label !== 'Unspecified' && (
+                            <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${getCostTone(costInfo.tone)}`} title={costInfo.label}>
+                                {costInfo.label.length > 25 ? costInfo.label.substring(0, 22) + '...' : costInfo.label}
+                            </span>
+                        )}
                         <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${opp.status === 'Live' ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-700' : 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600'}`}>
                             {opp.status.toUpperCase()}
                         </span>
