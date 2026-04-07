@@ -11,7 +11,7 @@
     "scraper:dev": "nodemon scraper-enhanced.js",
     "cleanup:homepage-links": "node cleanup-homepage-links.js",
     "cleanup:homepage-links:apply": "node cleanup-homepage-links.js --apply",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && npx playwright install chromium"
   },
   "dependencies": {
     "@google/genai": "latest",
