@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node api/index.js",
     "dev": "nodemon api/index.js",
+    "scraper": "node scraper-enhanced.js",
+    "scraper:dev": "nodemon scraper-enhanced.js",
     "cleanup:homepage-links": "node cleanup-homepage-links.js",
     "cleanup:homepage-links:apply": "node cleanup-homepage-links.js --apply",
     "postinstall": "prisma generate"
@@ -19,7 +21,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "playwright": "^1.40.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",

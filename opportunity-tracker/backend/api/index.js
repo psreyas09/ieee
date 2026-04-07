@@ -49,6 +49,21 @@ const toOrganizationResponse = (org) => {
     };
 };
 
+const SCRAPE_QUEUE_COOLDOWN_MS = Math.max(60 * 1000, Number(process.env.SCRAPE_QUEUE_COOLDOWN_MS || 60 * 60 * 1000));
+const SCRAPE_QUEUE_ORG_LIMIT = Math.max(1, Number(process.env.SCRAPE_QUEUE_ORG_LIMIT || 5));
+const SCRAPE_QUEUE_URLS_PER_ORG = Math.max(1, Number(process.env.SCRAPE_QUEUE_URLS_PER_ORG || 2));
+const SCRAPE_QUEUE_TOTAL_URL_LIMIT = Math.max(1, Number(process.env.SCRAPE_QUEUE_TOTAL_URL_LIMIT || 5));
+
+const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
+
+const isWorkerToken = (token) => {
+    const acceptedSecrets = [process.env.SCRAPER_API_SECRET]
+        .filter(isNonEmptyString);
+
+    if (!isNonEmptyString(token)) return false;
+    return acceptedSecrets.includes(token);
+};
+
 const monthPattern = '(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)';
 
 const parseOpportunityDate = (value) => {
@@ -537,6 +552,36 @@ const authenticateAdmin = (req, res, next) => {
     }
 };
 
+const authenticateScraperWorker = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!isNonEmptyString(token)) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!isNonEmptyString(process.env.SCRAPER_API_SECRET)) {
+        console.error('SCRAPER_API_SECRET is missing. Worker endpoints are disabled.');
+        return res.status(503).json({ error: 'Scraper worker auth is not configured' });
+    }
+
+    if (isWorkerToken(token)) {
+        req.workerAuth = { type: 'worker-secret' };
+        return next();
+    }
+
+    console.error('Unauthorized worker request', {
+        path: req.path,
+        method: req.method,
+        authType: 'bearer',
+        hasToken: Boolean(token)
+    });
+    return res.status(401).json({ error: 'Invalid worker token' });
+};
+
 // --- Routes ---
 
 // Public Routes
@@ -840,6 +885,146 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
     } catch (error) {
         console.error('Scraping error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Worker queue endpoint with claim-on-fetch semantics.
+app.get('/api/admin/scrape-queue', authenticateScraperWorker, async (req, res) => {
+    try {
+        const now = new Date();
+        const cutoff = new Date(now.getTime() - SCRAPE_QUEUE_COOLDOWN_MS);
+
+        const rawCandidates = await prisma.organization.findMany({
+            where: {
+                isActive: true,
+                scrapeUrl: { not: null },
+                OR: [
+                    { lastScrapedAt: null },
+                    { lastScrapedAt: { lt: cutoff } }
+                ]
+            },
+            orderBy: [
+                { lastScrapedAt: 'asc' },
+                { name: 'asc' }
+            ],
+            take: SCRAPE_QUEUE_ORG_LIMIT * 3,
+            select: {
+                id: true,
+                name: true,
+                scrapeUrl: true,
+                lastScrapedAt: true
+            }
+        });
+
+        // Randomize among currently eligible orgs to reduce repeated priority bias.
+        const candidates = [...rawCandidates]
+            .sort(() => Math.random() - 0.5)
+            .slice(0, SCRAPE_QUEUE_ORG_LIMIT);
+
+        const queueItems = [];
+
+        // Best-effort claim: each organization is atomically claimed before enqueueing URLs.
+        for (const org of candidates) {
+            if (queueItems.length >= SCRAPE_QUEUE_TOTAL_URL_LIMIT) break;
+
+            const claimed = await prisma.organization.updateMany({
+                where: {
+                    id: org.id,
+                    OR: [
+                        { lastScrapedAt: null },
+                        { lastScrapedAt: { lt: cutoff } }
+                    ]
+                },
+                data: {
+                    lastScrapedAt: now
+                }
+            });
+
+            if (claimed.count === 0) continue;
+
+            const urls = parseScrapeUrls(org.scrapeUrl).slice(0, SCRAPE_QUEUE_URLS_PER_ORG);
+            for (const url of urls) {
+                if (queueItems.length >= SCRAPE_QUEUE_TOTAL_URL_LIMIT) break;
+
+                queueItems.push({
+                    url,
+                    organizationId: org.id,
+                    organizationName: org.name,
+                    status: 'processing',
+                    claimedAt: now.toISOString()
+                });
+            }
+        }
+
+        res.json({
+            ok: true,
+            count: queueItems.length,
+            cooldownMs: SCRAPE_QUEUE_COOLDOWN_MS,
+            totalUrlLimit: SCRAPE_QUEUE_TOTAL_URL_LIMIT,
+            items: queueItems,
+            urls: queueItems.map(item => item.url)
+        });
+    } catch (error) {
+        console.error('Error building scrape queue:', error);
+        res.status(500).json({ error: 'Failed to build scrape queue' });
+    }
+});
+
+// Worker result ingest endpoint with payload validation and dedup-aware processing.
+app.post('/api/admin/scrape-result', authenticateScraperWorker, async (req, res) => {
+    try {
+        const payload = req.body || {};
+        const opportunity = payload.opportunity || {};
+        const sourceUrl = String(payload.sourceUrl || opportunity.url || '').trim();
+        const organizationId = String(payload.organizationId || opportunity.organizationId || '').trim();
+        const title = String(opportunity.title || '').trim();
+
+        if (!isValidHttpUrl(sourceUrl)) {
+            return res.status(400).json({ error: 'sourceUrl must be a valid http(s) URL' });
+        }
+
+        if (!organizationId) {
+            return res.status(400).json({ error: 'organizationId is required' });
+        }
+
+        if (!title) {
+            return res.status(400).json({ error: 'opportunity.title is required' });
+        }
+
+        const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+        if (!organization) {
+            return res.status(404).json({ error: 'Organization not found for organizationId' });
+        }
+
+        const normalizedOpportunity = {
+            ...opportunity,
+            title,
+            description: String(opportunity.description || '').trim(),
+            eligibility: isNonEmptyString(opportunity.eligibility) ? String(opportunity.eligibility).trim() : null,
+            url: sourceUrl,
+            type: isNonEmptyString(opportunity.type) ? String(opportunity.type).trim() : 'Other',
+            status: isNonEmptyString(opportunity.status) ? String(opportunity.status).trim() : 'Live',
+            deadline: opportunity.deadline || null,
+        };
+
+        const result = await processScrapedOpportunities(organization, [normalizedOpportunity]);
+
+        console.log('Scrape result ingested:', {
+            organizationId,
+            sourceUrl,
+            opportunitiesFound: result.opportunitiesFound,
+            opportunitiesAdded: result.opportunitiesAdded
+        });
+
+        res.json({
+            ok: true,
+            organizationId,
+            sourceUrl,
+            ...result
+        });
+    } catch (error) {
+        console.error('Error ingesting scrape result:', error);
+        res.status(500).json({ error: 'Failed to ingest scrape result' });
     }
 });
 
