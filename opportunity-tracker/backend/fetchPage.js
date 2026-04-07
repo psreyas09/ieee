@@ -5,11 +5,16 @@
  */
 
 const axios = require('axios');
+const https = require('https');
 const browserManager = require('./browserManager');
 
 const PAGE_TIMEOUT_MS = Math.max(5000, parseInt(process.env.PAGE_TIMEOUT_MS || '30000', 10));
 const PLAYWRIGHT_DELAY_MIN_MS = Math.max(500, parseInt(process.env.REQUEST_DELAY_MIN_MS || '1500', 10));
 const PLAYWRIGHT_DELAY_MAX_MS = Math.max(PLAYWRIGHT_DELAY_MIN_MS + 250, parseInt(process.env.REQUEST_DELAY_MAX_MS || '4000', 10));
+const AXIOS_INSECURE_SSL = String(process.env.AXIOS_INSECURE_SSL || 'false').toLowerCase() === 'true';
+const axiosHttpsAgent = AXIOS_INSECURE_SSL
+  ? new https.Agent({ rejectUnauthorized: false })
+  : undefined;
 
 // Anti-bot detection patterns
 const BLOCK_PATTERNS = [
@@ -48,6 +53,7 @@ async function fetchWithAxios(url) {
   });
 
   const response = await axiosInstance.get(url, {
+    httpsAgent: axiosHttpsAgent,
     headers: {
       'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
