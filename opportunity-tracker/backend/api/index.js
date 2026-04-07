@@ -1671,6 +1671,27 @@ app.put('/api/admin/organizations/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
+app.delete('/api/admin/organizations/:id', authenticateAdmin, async (req, res) => {
+    try {
+        const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
+        if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+        await prisma.$transaction(async (tx) => {
+            await tx.opportunity.deleteMany({
+                where: { organizationId: req.params.id }
+            });
+
+            await tx.organization.delete({
+                where: { id: req.params.id }
+            });
+        });
+
+        res.json({ success: true, message: 'Organization and related opportunities deleted.' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/api/admin/organizations/:id/enqueue', authenticateAdmin, async (req, res) => {
     try {
         const org = await prisma.organization.findUnique({ where: { id: req.params.id } });

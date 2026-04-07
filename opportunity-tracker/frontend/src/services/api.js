@@ -29,6 +29,7 @@ export const deleteOpportunity = (id) => api.delete(`/admin/opportunities/${id}`
 export const verifyOpportunity = (id, verified) => api.post(`/admin/opportunities/${id}/verify`, { verified }).then(res => res.data);
 export const createOrganization = (data) => api.post('/admin/organizations', data).then(res => res.data);
 export const updateOrganization = (id, data) => api.put(`/admin/organizations/${id}`, data).then(res => res.data);
+export const deleteOrganization = (id) => api.delete(`/admin/organizations/${id}`).then(res => res.data);
 export const addOrganizationScrapeUrl = (id, url) => api.post(`/admin/organizations/${id}/scrape-urls`, { url }).then(res => res.data);
 export const deleteOrganizationScrapeUrl = (id, url) => api.delete(`/admin/organizations/${id}/scrape-urls`, { data: { url } }).then(res => res.data);
 export const getScrapeHealth = () => api.get('/admin/scrape-health').then(res => res.data);

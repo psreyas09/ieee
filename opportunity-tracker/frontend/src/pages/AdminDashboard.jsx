@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOpportunity, updateOrganization, createOrganization, addOrganizationScrapeUrl, deleteOrganizationScrapeUrl, getScrapeHealth, getDuplicateGroups, mergeDuplicates, verifyOpportunity } from '../services/api';
+import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOpportunity, updateOrganization, createOrganization, deleteOrganization, addOrganizationScrapeUrl, deleteOrganizationScrapeUrl, getScrapeHealth, getDuplicateGroups, mergeDuplicates, verifyOpportunity } from '../services/api';
 import { Activity, Trash2, ExternalLink, RefreshCw, LogOut, PlusCircle, X, Pencil } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -482,6 +482,21 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleDeleteOrganization = async (org) => {
+        const confirmed = confirm(
+            `Delete organization "${org.name}" and all of its opportunities? This cannot be undone.`
+        );
+        if (!confirmed) return;
+
+        try {
+            await deleteOrganization(org.id);
+            showToast('Organization deleted successfully.');
+            fetchData();
+        } catch (error) {
+            showToast(error.response?.data?.error || 'Failed to delete organization.');
+        }
+    };
+
     const getDateInputValue = (value) => {
         if (!value) return '';
         const date = new Date(value);
@@ -656,6 +671,14 @@ export default function AdminDashboard() {
                                             title="Edit All Scrape URLs"
                                         >
                                             <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteOrganization(org)}
+                                            disabled={scrapingId !== null || isScrapingAll}
+                                            className={`p-2 rounded-md ${scrapingId !== null || isScrapingAll ? 'bg-slate-50 text-slate-300' : 'bg-red-100 text-red-700 hover:bg-red-200'} transition-colors`}
+                                            title="Delete Organization"
+                                        >
+                                            <Trash2 size={16} />
                                         </button>
                                     </div>
                                 </div>
