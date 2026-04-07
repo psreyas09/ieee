@@ -21,8 +21,8 @@ const geminiApiKeys = getGeminiApiKeys();
 const geminiClients = geminiApiKeys.map(apiKey => new GoogleGenAI({ apiKey }));
 let nextGeminiClientIndex = 0;
 
-const GEMINI_PRIMARY_MODEL = 'gemini-3.1-flash-lite-preview';
-const GEMINI_FALLBACK_MODEL = 'gemini-3.1-flash';
+const GEMINI_PRIMARY_MODEL = process.env.GEMINI_PRIMARY_MODEL || 'gemini-3.1-flash-lite-preview';
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-3-flash-preview';
 
 const SAFE_CRAWL_MAX_PAGES = Number(process.env.SCRAPER_MAX_PAGES || 8);
 const SAFE_CRAWL_MAX_DEPTH = Number(process.env.SCRAPER_MAX_DEPTH || 1);
