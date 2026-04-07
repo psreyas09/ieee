@@ -100,6 +100,21 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const randomDelay = (minMs, maxMs) => Math.floor(minMs + Math.random() * (maxMs - minMs));
 
+async function ensureLocalQueueFile() {
+  try {
+    await fs.access(resultsQueuePath);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      await fs.writeFile(resultsQueuePath, '');
+      log('info', 'Queue', 'Initialized local retry queue file', {
+        queueFile: resultsQueuePath,
+      });
+      return;
+    }
+    throw error;
+  }
+}
+
 function getBackoffDelay(attempt, baseMs) {
   const jitter = 0.8 + Math.random() * 0.4;
   return Math.floor(baseMs * Math.pow(2, attempt) * jitter);
@@ -214,6 +229,7 @@ async function processHTML(html, url) {
  */
 async function queueResultLocally(result) {
   try {
+    await ensureLocalQueueFile();
     const line = JSON.stringify(result) + '\n';
     await fs.appendFile(resultsQueuePath, line);
     log('warn', 'Queue', 'Retry queued (non-durable)', {
@@ -283,6 +299,7 @@ async function sendResultToAPI(result, options = {}) {
 async function flushLocalQueue() {
   setInterval(async () => {
     try {
+      await ensureLocalQueueFile();
       const data = await fs.readFile(resultsQueuePath, 'utf-8');
       const lines = data.split('\n').filter(Boolean);
 
@@ -302,10 +319,15 @@ async function flushLocalQueue() {
       }
 
       if (flushed === lines.length) {
+        await ensureLocalQueueFile();
         await fs.writeFile(resultsQueuePath, '');
         log('info', 'Queue', 'Queue flushed successfully', { count: flushed });
       }
     } catch (error) {
+      if (error.code === 'ENOENT') {
+        await ensureLocalQueueFile();
+        return;
+      }
       log('error', 'Queue', 'Queue flush failed', { error: error.message });
     }
   }, 60000); // Every minute
@@ -598,6 +620,8 @@ async function main() {
   process.on('SIGHUP', () => shutdown('SIGHUP'));
 
   try {
+    await ensureLocalQueueFile();
+
     // Initialize browser
     log('info', 'Scraper', 'Initializing browser...', {});
     await browserManager.initialize(proxyConfig);
