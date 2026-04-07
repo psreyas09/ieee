@@ -9,11 +9,6 @@
             }
         },
         {
-            "src": "api/**/*.js",
-            "use": "@vercel/node",
-            "config": { "maxDuration": 60 }
-        },
-        {
             "src": "backend/api/**/*.js",
             "use": "@vercel/node",
             "config": { "maxDuration": 60 }
@@ -21,19 +16,11 @@
     ],
     "routes": [
         {
-            "src": "/api/admin/scrape-queue",
-            "dest": "/api/admin/scrape-queue.js"
-        },
-        {
-            "src": "/api/admin/scrape-result",
-            "dest": "/api/admin/scrape-result.js"
-        },
-        {
             "src": "/api/(.*)",
-            "dest": "/api/index.js"
+            "dest": "/backend/api/index.js"
         },
         {
-            "src": "^/([^.]+)$",
+            "src": "^/(?!api/)([^.]+)$",
             "dest": "/frontend/index.html"
         },
         {
