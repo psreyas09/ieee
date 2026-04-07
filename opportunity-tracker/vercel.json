@@ -21,8 +21,16 @@
     ],
     "routes": [
         {
+            "src": "/api/admin/scrape-queue",
+            "dest": "/api/admin/scrape-queue.js"
+        },
+        {
+            "src": "/api/admin/scrape-result",
+            "dest": "/api/admin/scrape-result.js"
+        },
+        {
             "src": "/api/(.*)",
-            "dest": "/api/$1"
+            "dest": "/api/index.js"
         },
         {
             "src": "^/([^.]+)$",
