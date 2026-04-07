@@ -1555,7 +1555,10 @@ app.post('/api/admin/organizations', authenticateAdmin, async (req, res) => {
             return res.status(400).json({ error: 'Invalid officialWebsite. Must be a valid http(s) URL.' });
         }
 
-        const nextScrapeUrls = parseScrapeUrls(scrapeUrls !== undefined ? scrapeUrls : scrapeUrl);
+        let nextScrapeUrls = parseScrapeUrls(scrapeUrls !== undefined ? scrapeUrls : scrapeUrl);
+        if (nextScrapeUrls.length === 0 && nextOfficialWebsite) {
+            nextScrapeUrls = [nextOfficialWebsite];
+        }
         const invalidUrl = nextScrapeUrls.find(url => !isValidHttpUrl(url));
         if (invalidUrl) {
             return res.status(400).json({ error: `Invalid scrape URL: ${invalidUrl}` });
@@ -1571,7 +1574,8 @@ app.post('/api/admin/organizations', authenticateAdmin, async (req, res) => {
                 name: cleanedName,
                 type: cleanedType,
                 officialWebsite: nextOfficialWebsite,
-                scrapeUrl: serializeScrapeUrls(nextScrapeUrls)
+                scrapeUrl: serializeScrapeUrls(nextScrapeUrls),
+                lastScrapedAt: null
             }
         });
 
@@ -1596,7 +1600,11 @@ app.post('/api/admin/organizations/:id/scrape-urls', authenticateAdmin, async (r
         const updated = [...new Set([...parseScrapeUrls(org.scrapeUrl), nextUrl])];
         const saved = await prisma.organization.update({
             where: { id: req.params.id },
-            data: { scrapeUrl: serializeScrapeUrls(updated) }
+            data: {
+                scrapeUrl: serializeScrapeUrls(updated),
+                // Make the organization immediately eligible in queue after URL changes.
+                lastScrapedAt: null
+            }
         });
 
         res.json(toOrganizationResponse(saved));
@@ -1652,11 +1660,37 @@ app.put('/api/admin/organizations/:id', authenticateAdmin, async (req, res) => {
             where: { id: req.params.id },
             data: {
                 scrapeUrl: hasScrapeUrlPayload ? nextScrapeUrl : undefined,
+                lastScrapedAt: hasScrapeUrlPayload ? null : undefined,
                 name: typeof name === 'string' ? name.trim() : undefined,
                 officialWebsite: typeof officialWebsite === 'string' ? officialWebsite.trim() : undefined
             }
         });
         res.json(toOrganizationResponse(org));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/admin/organizations/:id/enqueue', authenticateAdmin, async (req, res) => {
+    try {
+        const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
+        if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+        const scrapeUrls = parseScrapeUrls(org.scrapeUrl);
+        if (scrapeUrls.length === 0) {
+            return res.status(400).json({ error: 'Organization has no scrape URL configured' });
+        }
+
+        const updated = await prisma.organization.update({
+            where: { id: req.params.id },
+            data: { lastScrapedAt: null }
+        });
+
+        res.json({
+            success: true,
+            message: 'Organization enqueued for next scrape cycle',
+            organization: toOrganizationResponse(updated)
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
