@@ -4,7 +4,8 @@
   "description": "IEEE Opportunity Tracker API",
   "main": "api/index.js",
   "scripts": {
-    "start": "node api/index.js",
+    "start": "node scraper-enhanced.js",
+    "api:start": "node api/index.js",
     "dev": "nodemon api/index.js",
     "scraper": "node scraper-enhanced.js",
     "scraper:dev": "nodemon scraper-enhanced.js",
