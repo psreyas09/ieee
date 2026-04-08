@@ -8,10 +8,6 @@ const PAID_PATTERNS = [
     /\bsubscription\b/i,
     /\bpayment required\b/i,
     /\bnon-refundable\b/i,
-    /\busd\s?\$?\d+/i,
-    /\$\s?\d+/,
-    /\beur\s?\$?\d+/i,
-    /\binr\s?\$?\d+/i,
     /\bconference fee\b/i,
     /\bconference registration\b/i,
     /\bufee\b/i,
@@ -31,6 +27,24 @@ const PAID_PATTERNS = [
     /\bbook\s+and\s+pay\b/i,
     /\bproof\s+of\s+registration\b/i,
     /\bregistration\s+at\s+the\s+(full|student)\s+rate\b/i,
+];
+
+const FREE_ENTRY_PATTERNS = [
+    /\bno\s+(entry|application|nomination|submission|registration)\s+fee\b/i,
+    /\bfree\s+to\s+(apply|enter|nominate|submit)\b/i,
+    /\bno\s+fee\s+required\b/i,
+    /\bwithout\s+fee\b/i,
+    /\bopen\s+to\s+all\b/i,
+];
+
+const SELF_FUNDED_TRAVEL_PATTERNS = [
+    /\btravel\s+costs?\s+are\s+not\s+covered\b/i,
+    /\btravel\s+is\s+not\s+covered\b/i,
+    /\bself[-\s]?funded\s+travel\b/i,
+    /\bwinner\s+pays\b/i,
+    /\byou\s+must\s+pay\s+for\s+your\s+own\s+(travel|flight|hotel|accommodation)\b/i,
+    /\bflight\s+and\s+hotel\s+are\s+not\s+covered\b/i,
+    /\btravel\s+expenses\s+are\s+not\s+covered\b/i,
 ];
 
 const FREE_PATTERNS = [
@@ -145,10 +159,13 @@ export function getCostInfo(opportunity) {
     const isReimbursement = REIMBURSEMENT_PATTERNS.some((pattern) => pattern.test(combinedText));
     const hasMonetaryAwardSignal = MONETARY_AWARD_PATTERNS.some((pattern) => pattern.test(combinedText));
     const isAwardTypeWithMoney = type.includes('award') && hasMonetaryAwardSignal;
+    const isPrizeLikeAward = hasMonetaryAwardSignal && (type.includes('award') || /\baward\b/i.test(combinedText));
     const isFellowshipTypeWithFunding = type.includes('fellowship')
         && FELLOWSHIP_FUNDING_PATTERNS.some((pattern) => pattern.test(combinedText));
     const isPaid = PAID_PATTERNS.some((pattern) => pattern.test(combinedText));
     const isFree = FREE_PATTERNS.some((pattern) => pattern.test(combinedText));
+    const isFreeEntry = FREE_ENTRY_PATTERNS.some((pattern) => pattern.test(combinedText));
+    const isSelfFundedTravel = SELF_FUNDED_TRAVEL_PATTERNS.some((pattern) => pattern.test(combinedText));
 
     // Detect membership-gated offers and extract organization acronym
     let memberType = null;
@@ -171,6 +188,18 @@ export function getCostInfo(opportunity) {
     }
 
     // Mixed scenarios first so they are not swallowed by single-category checks.
+    if (isPrizeLikeAward && isFreeEntry && isSelfFundedTravel) {
+        return { label: 'Free Entry + Cash Prize (Travel Self-Funded)', tone: 'reimbursement', category: 'mixed' };
+    }
+    if (isPrizeLikeAward && isFreeEntry) {
+        return { label: 'Free Entry + Cash Prize', tone: 'reimbursement', category: 'mixed' };
+    }
+    if (isPrizeLikeAward && isSelfFundedTravel) {
+        return { label: 'Cash Prize (Travel Self-Funded)', tone: 'reimbursement', category: 'mixed' };
+    }
+    if (isPrizeLikeAward) {
+        return { label: 'Cash Prize', tone: 'reimbursement', category: 'reimbursement' };
+    }
     if (isPaid && isFree) return { label: 'Mixed', tone: 'neutral', category: 'mixed' };
     if (isPaid && (isReimbursement || isAwardTypeWithMoney || isFellowshipTypeWithFunding)) return { label: 'Paid (Reimbursable)', tone: 'paid', category: 'mixed' };
     if (isFree && (isReimbursement || isAwardTypeWithMoney || isFellowshipTypeWithFunding)) return { label: 'Free + Reimbursement', tone: 'reimbursement', category: 'mixed' };

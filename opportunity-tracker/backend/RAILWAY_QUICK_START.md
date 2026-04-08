@@ -32,6 +32,7 @@ Optional:
 Ensure these API endpoints are deployed:
 - GET /api/admin/scrape-queue
 - POST /api/admin/scrape-result
+- POST /api/admin/scrape-failure
 
 And set Vercel variables:
 - SCRAPER_API_SECRET
@@ -50,6 +51,11 @@ Expected log sequence:
 - Fetching URL queue from API
 - No jobs. Sleeping... OR Processing queue
 
+## 5b) Admin Scrape Behavior
+- Admin "Scrape" now enqueues the organization for the Railway worker instead of scraping directly in Vercel.
+- The worker is the only path that runs the hybrid fetch pipeline (`Axios -> Playwright fallback`).
+- If an organization has no explicit scrape URL, the queue falls back to `officialWebsite` when it is valid.
+
 ## 6) Validate End-to-End
 - One successful URL should show:
   - Success with Axios OR Success with Playwright
@@ -57,6 +63,7 @@ Expected log sequence:
 - Blocked URLs should show:
   - errorType: anti_bot
   - Skipped due to anti-bot cooldown (on next attempts)
+- Admin-triggered scrapes should show queueing in the UI, then be processed later by the worker.
 
 ## 7) Common Problems
 - API returns HTML instead of JSON:
@@ -69,7 +76,8 @@ Expected log sequence:
   - No eligible organizations (cooldown active or missing scrape URLs)
 
 ## 8) Fast Operational Tips
-- Add or edit scrape URLs, then enqueue org for immediate pickup
+- Add or edit scrape URLs, or rely on `officialWebsite` fallback when no explicit scrape URL exists
+- Enqueue orgs from Admin for immediate pickup by the worker
 - Keep MAX_CONCURRENT low on free tier
 - Treat anti-bot failures as expected partial-failure behavior
 - Local queue file is best-effort only on container restarts

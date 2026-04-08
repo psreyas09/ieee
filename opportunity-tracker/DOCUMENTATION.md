@@ -20,7 +20,9 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - Node.js + Express exposed via Vercel serverless routes
 - Prisma ORM with PostgreSQL (Neon)
 - JWT-protected admin APIs
-- Scraper pipeline with Axios + Cheerio + Gemini models
+- Vercel admin scrape trigger is enqueue-only
+- Railway worker runs the hybrid scraper pipeline with Axios first and Playwright fallback
+- Scraper pipeline with Axios + Cheerio + Gemini models for the Vercel-side extraction path
 
 ### Database Models
 - `Organization`: source entities and scrape metadata (`scrapeUrl`, `officialWebsite`, `lastScrapedAt`)
@@ -82,7 +84,7 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 ## Admin Capabilities
 
 - Secure login via JWT (`/api/admin/login`)
-- Trigger scrape per organization (`/api/admin/scrape/:id`)
+- Trigger scrape per organization (`/api/admin/scrape/:id`) now enqueues the org for the Railway worker
 - Sequential "Scrape All" from UI
 - Auto-refresh of dashboard data every 30 seconds
 - CRUD for manual opportunities
@@ -97,59 +99,63 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 
 ## Recent Reliability and UX Additions
 
-1. Added **Edit Scrape URL** admin action in UI.
-2. Added backend validation for organization URLs (`http(s)` only).
-3. Added scraper fallback from `scrapeUrl` to `officialWebsite` on `404`.
-4. Corrected Student Activities default scrape URL to `https://students.ieee.org/`.
-5. Hardened cron endpoint behavior:
+1. Switched admin scraping to enqueue-only so the Railway worker is the single execution path for actual scraping.
+2. Added `officialWebsite` fallback when an organization has no explicit scrape URL.
+3. Added DB-level unique canonical URL enforcement for opportunities.
+
+4. Added **Edit Scrape URL** admin action in UI.
+5. Added backend validation for organization URLs (`http(s)` only).
+6. Added scraper fallback from `scrapeUrl` to `officialWebsite` on `404`.
+7. Corrected Student Activities default scrape URL to `https://students.ieee.org/`.
+8. Hardened cron endpoint behavior:
 	 - explicit error when `CRON_SECRET` is missing
 	 - batch size increased to 5 orgs per run
 	 - Vercel function `maxDuration` set to 60s for backend function
-6. Improved Gemini quota behavior:
+9. Improved Gemini quota behavior:
 	 - returns `429` for quota exhaustion in admin scrape endpoint
 	 - includes `retryAfterSec` when available from provider response
 	 - rotates/fails over to secondary configured key(s)
-7. Seed and maintenance safety:
+10. Seed and maintenance safety:
 	 - `seed.js` is idempotent/non-destructive for organizations and admin user
 	 - `/api/admin/force-seed` no longer overwrites existing custom Student Activities scrape URL
-8. Phase 1 reliability + dedup tooling:
+11. Phase 1 reliability + dedup tooling:
 	 - scrape run logging added to both manual scrape and cron scrape flows
 	 - scrape health APIs provide 7-day success/failure/add metrics and last error visibility
 	 - duplicate detection groups opportunities and recommends primary record
 	 - merge endpoint safely consolidates duplicates into one primary record
-9. Production hardening:
+12. Production hardening:
 	 - scrape health endpoint no longer hard-fails if `ScrapeRunLog` migration is pending; returns fallback payload with warning
 	 - admin dashboard uses partial-load fetch strategy so one failing section does not blank the full page
-10. Count consistency fix:
+13. Count consistency fix:
 	 - closing-soon stats API and dashboard urgent list now share day-boundary 7-day logic to reduce count/card mismatch
-11. Link trust and continuity improvements:
+14. Link trust and continuity improvements:
 	 - scraper no longer stores generic listing roots as opportunity links
 	 - hard-dead links are filtered before save
 	 - missing/invalid event links now fallback to organization-level URL
-12. Region restriction visibility:
+15. Region restriction visibility:
 	 - cards and detail pages show `Region Restricted`/`<Place> Only` badges when eligibility text clearly ties participants to a country or region
 	 - generic wording without concrete geography is intentionally not flagged
-13. Verification lifecycle:
+16. Verification lifecycle:
 	 - admin can toggle opportunity verification state from dashboard table
 	 - verified badge appears in admin + public cards/detail views
 	 - endpoint added: `POST /api/admin/opportunities/:id/verify`
-14. Preference-driven personalization (client-side):
+17. Preference-driven personalization (client-side):
 	 - first-run onboarding captures persona, region, and interests
 	 - preferences are stored locally in browser storage (no DB persistence)
 	 - preferences can be reopened/edited via header action
 	 - homepage and feed now adapt defaults from saved preferences
-15. Feed filtering upgrades:
+18. Feed filtering upgrades:
 	 - type filtering supports true multi-select behavior
 	 - backend opportunities API supports CSV `types` query param
 	 - text search ignores background type-preference constraints so exact matches are discoverable
-16. Directory redesigned as category navigation:
+19. Directory redesigned as category navigation:
 	 - category cards, membership cards, region cards with live counts
 	 - card interactions navigate to feed with pre-applied quick filters
-17. Preference-aware dashboard summary cards:
+20. Preference-aware dashboard summary cards:
 	 - `Total Tracked`, `Active Now`, `Closing This Week`, and `Organizations` are computed from opportunities that match saved preference-derived types
 	 - these counters update when preferences are changed via the header preferences modal
 	 - interest selections are normalized to valid opportunity types so Explore type checkboxes remain aligned with saved interests
-18. Persona eligibility filtering (server-side):
+21. Persona eligibility filtering (server-side):
 	 - opportunities API now supports `persona` query and applies eligibility exclusion rules before pagination
 	 - this prevents ineligible opportunities (for example, IEEE-members-only items for `Non-IEEE Member`) from leaking into later pages
 	 - dashboard/feed totals can decrease after persona filtering because ineligible records are intentionally removed from result sets

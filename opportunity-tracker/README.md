@@ -5,16 +5,21 @@ A full-stack web application designed for IEEE student members to discover compe
 - Frontend: React + Vite + Tailwind CSS
 - Backend: Node.js (Express -> Vercel Serverless Functions)
 - Database: PostgreSQL (Neon) via Prisma
-- AI Scraping: Axios + Cheerio + Google Gemini API (`gemini-3.1-flash-lite-preview`, fallback `gemini-3.1-flash`)
+- AI Scraping: Axios + Cheerio + Google Gemini API for Vercel-side extraction, plus a Railway worker that uses Axios with Playwright fallback for the hybrid scrape pipeline
 
 ## Scraper Provider Map
 - URL sourcing: Organization `scrapeUrls` / `scrapeUrl`, fallback `officialWebsite` (backend + Prisma).
-- HTTP fetch provider: `axios` with browser-like headers.
-- HTML parsing provider: `cheerio`.
+- Vercel admin scrape trigger: enqueue-only, no direct Playwright usage.
+- Railway worker fetch provider: Axios first, Playwright fallback via `fetchPage`.
+- HTML parsing provider: `cheerio` for the Vercel-side scraper, DOM extraction inside the worker pipeline as needed.
 - AI extraction provider: Google Gemini API via `@google/genai`.
 - Persistence provider: Prisma ORM writing to Neon PostgreSQL.
 
 ## Recent Feature Updates
+- Admin scrape now enqueues the organization for the Railway worker instead of running the scrape directly in Vercel.
+- Railway worker owns the actual hybrid scraping flow, including Playwright fallback and browser recovery.
+- `officialWebsite` now acts as a queue fallback when an organization has no explicit scrape URL.
+- DB-level dedup hard stop added with a unique index on canonical opportunity URL.
 - Opportunity verification workflow shipped end-to-end:
    - Admin can toggle verification per opportunity (`Verify` action in Admin table)
    - Verified badge/checkmark is shown on cards, detail pages, and overview/feed cards
