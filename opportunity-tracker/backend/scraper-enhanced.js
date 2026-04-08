@@ -58,8 +58,16 @@ let metrics = {
   processed: 0,
   successful: 0,
   failed: 0,
+  axiosSuccess: 0,
+  playwrightUsed: 0,
   totalFetchTime: 0,
   errors: {},
+};
+
+let metricsWindow = {
+  axiosSuccess: 0,
+  playwrightUsed: 0,
+  failures: 0,
 };
 
 /**
@@ -190,12 +198,25 @@ function reportMetrics() {
       processed: metrics.processed,
       successful: metrics.successful,
       failed: metrics.failed,
+      axiosSuccess: metrics.axiosSuccess,
+      playwrightUsed: metrics.playwrightUsed,
       avgFetchMs:
         metrics.processed > 0
           ? Math.round(metrics.totalFetchTime / metrics.processed)
           : 0,
       errorTypes: metrics.errors,
+      windowSummary: {
+        axiosSuccess: metricsWindow.axiosSuccess,
+        playwrightUsed: metricsWindow.playwrightUsed,
+        failures: metricsWindow.failures,
+      },
     });
+
+    metricsWindow = {
+      axiosSuccess: 0,
+      playwrightUsed: 0,
+      failures: 0,
+    };
   }, 300000); // Every 5 minutes
 }
 
@@ -448,6 +469,17 @@ async function processURL(item) {
       metrics.successful++;
     } else {
       metrics.failed++;
+      metricsWindow.failures++;
+    }
+
+    if (methodUsed === 'axios') {
+      metrics.axiosSuccess++;
+      metricsWindow.axiosSuccess++;
+    }
+
+    if (methodUsed === 'playwright') {
+      metrics.playwrightUsed++;
+      metricsWindow.playwrightUsed++;
     }
 
     metrics.totalFetchTime += fetchTime;
@@ -481,6 +513,7 @@ async function processURL(item) {
     }
 
     metrics.failed++;
+    metricsWindow.failures++;
     metrics.totalFetchTime += fetchTime;
     metrics.errors[errorType] = (metrics.errors[errorType] || 0) + 1;
 
