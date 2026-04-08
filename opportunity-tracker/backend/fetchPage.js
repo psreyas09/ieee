@@ -43,6 +43,17 @@ function isBlockPage(html) {
   return suspiciouslySmallHtml || BLOCK_PATTERNS.some(pattern => pattern.test(normalized));
 }
 
+function isAntiBotError(error) {
+  const message = String(error?.message || '');
+  return (
+    message.includes('Block page detected') ||
+    message.includes('anti-bot') ||
+    message.includes('captch') ||
+    message.includes('403') ||
+    message.includes('429')
+  );
+}
+
 /**
  * Axes fetch with standard headers
  */
@@ -99,6 +110,9 @@ async function fetchWithPlaywright(url, proxyConfig = {}) {
 
     return html;
   } catch (error) {
+    if (isBlockPage(error?.message) || isAntiBotError(error)) {
+      throw new Error(`Playwright fetch blocked: ${error.message}`);
+    }
     throw new Error(`Playwright fetch failed: ${error.message}`);
   } finally {
     if (page) {
@@ -171,6 +185,10 @@ async function fetchPage(url, options = {}) {
         console.error(`[fetchPage] Playwright also failed: ${playwrightError.message}`);
         lastError = playwrightError;
 
+        if (isAntiBotError(playwrightError)) {
+          throw new Error(`Failed to fetch ${url}: ${playwrightError.message}`);
+        }
+
         // If this was the last attempt, throw
         if (attempt === maxRetries) {
           throw playwrightError;
@@ -183,6 +201,10 @@ async function fetchPage(url, options = {}) {
       }
     } catch (error) {
       lastError = error;
+
+      if (isAntiBotError(error)) {
+        throw new Error(`Failed to fetch ${url}: ${error.message}`);
+      }
 
       if (attempt === maxRetries) {
         throw new Error(`Failed to fetch ${url} after ${maxRetries + 1} attempts: ${error.message}`);

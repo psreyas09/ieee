@@ -27,7 +27,7 @@ class BrowserManager {
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage', // Important for Railway/Linux environments
           '--disable-gpu',
-          '--single-process=false', // Avoid single-process issues
+          '--single-process',
         ],
       };
 
