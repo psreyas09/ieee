@@ -28,6 +28,7 @@ const MAX_CONCURRENT = Math.max(1, Math.min(parseInt(process.env.MAX_CONCURRENT 
 const API_SEND_RETRIES = Math.max(0, parseInt(process.env.API_SEND_RETRIES || '2', 10));
 const API_SEND_BACKOFF_BASE_MS = Math.max(200, parseInt(process.env.API_SEND_BACKOFF_BASE_MS || '1000', 10));
 const URL_SEEN_COOLDOWN_MS = Math.max(60000, parseInt(process.env.URL_SEEN_COOLDOWN_MS || '3600000', 10));
+const ANTI_BOT_COOLDOWN_MS = Math.max(300000, parseInt(process.env.ANTI_BOT_COOLDOWN_MS || '21600000', 10));
 const REQUEST_DELAY_MIN_MS = Math.max(500, parseInt(process.env.REQUEST_DELAY_MIN_MS || '1500', 10));
 const REQUEST_DELAY_MAX_MS = Math.max(REQUEST_DELAY_MIN_MS + 250, parseInt(process.env.REQUEST_DELAY_MAX_MS || '4000', 10));
 
@@ -43,6 +44,7 @@ const proxyConfig =
 
 // State management
 const processedUrlTimestamps = new Map(); // URL -> last processed timestamp
+const blockedUrlCooldown = new Map(); // URL -> blockedUntil timestamp
 const resultsQueuePath = path.join(__dirname, '.scraper-queue.jsonl');
 let lastBrowserCheck = Date.now();
 let isShuttingDown = false;
@@ -139,6 +141,22 @@ function markUrlProcessed(url) {
       }
     }
   }
+}
+
+function isInAntiBotCooldown(url) {
+  const blockedUntil = blockedUrlCooldown.get(url);
+  if (!blockedUntil) return false;
+
+  if (Date.now() >= blockedUntil) {
+    blockedUrlCooldown.delete(url);
+    return false;
+  }
+
+  return true;
+}
+
+function markAntiBotBlocked(url) {
+  blockedUrlCooldown.set(url, Date.now() + ANTI_BOT_COOLDOWN_MS);
 }
 
 /**
@@ -364,6 +382,19 @@ async function processURL(item) {
     };
   }
 
+  if (isInAntiBotCooldown(url)) {
+    log('warn', 'Scraper', 'Skipped due to anti-bot cooldown', {
+      url,
+      cooldownMs: ANTI_BOT_COOLDOWN_MS,
+    });
+    return {
+      url,
+      success: false,
+      error: 'anti_bot_cooldown',
+      fetchTime: 0,
+    };
+  }
+
   const startTime = Date.now();
   metrics.processed++;
 
@@ -410,6 +441,14 @@ async function processURL(item) {
   } catch (error) {
     const fetchTime = Date.now() - startTime;
     const errorType = categorizeError(error);
+
+    if (errorType === 'anti_bot') {
+      markAntiBotBlocked(url);
+      log('warn', 'Scraper', 'Skipped due to anti-bot', {
+        url,
+        nextRetryInMs: ANTI_BOT_COOLDOWN_MS,
+      });
+    }
 
     metrics.failed++;
     metrics.totalFetchTime += fetchTime;
