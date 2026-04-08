@@ -201,6 +201,20 @@ const getNormalizedOpportunityUrl = (value) => {
     }
 };
 
+const getCanonicalOpportunityUrl = (value) => getNormalizedOpportunityUrl(value);
+
+const isCanonicalUrlUniqueViolation = (error) => {
+    if (error?.code !== 'P2002') return false;
+
+    const target = Array.isArray(error?.meta?.target)
+        ? error.meta.target.join(',').toLowerCase()
+        : String(error?.meta?.target || '').toLowerCase();
+
+    return target.includes('canonical_url')
+        || target.includes('canonicalurl')
+        || target.includes('unique_opportunity');
+};
+
 const GENERIC_LISTING_PATHS = new Set([
     '/',
     '/awards',
@@ -347,33 +361,62 @@ const processScrapedOpportunities = async (organization, opportunities) => {
 
         if (!existing) {
             const { parsedDate, finalStatus } = deriveOpportunityTiming(opp);
-            const created = await prisma.opportunity.create({
-                data: {
-                    title: opp.title,
-                    description: opp.description || '',
-                    deadline: parsedDate,
-                    eligibility: opp.eligibility,
-                    url: candidateUrl || organizationFallbackUrl,
-                    type: opp.type || 'Other',
-                    status: finalStatus,
-                    source: 'auto',
-                    organizationId: organization.id,
-                    lastFetchedAt: new Date()
+            const nextUrl = candidateUrl || organizationFallbackUrl;
+            const nextCanonicalUrl = getCanonicalOpportunityUrl(nextUrl);
+            let created = null;
+
+            try {
+                created = await prisma.opportunity.create({
+                    data: {
+                        title: opp.title,
+                        description: opp.description || '',
+                        deadline: parsedDate,
+                        eligibility: opp.eligibility,
+                        url: nextUrl,
+                        canonicalUrl: nextCanonicalUrl,
+                        type: opp.type || 'Other',
+                        status: finalStatus,
+                        source: 'auto',
+                        organizationId: organization.id,
+                        lastFetchedAt: new Date()
+                    }
+                });
+            } catch (error) {
+                if (!nextCanonicalUrl || !isCanonicalUrlUniqueViolation(error)) {
+                    throw error;
                 }
-            });
-            allExistingForOrg.push(created);
-            addedCount++;
-            continue;
+
+                existing = await prisma.opportunity.findUnique({
+                    where: { canonicalUrl: nextCanonicalUrl }
+                });
+            }
+
+            if (!created && !existing) {
+                continue;
+            }
+
+            if (created) {
+                allExistingForOrg.push(created);
+                addedCount++;
+                continue;
+            }
+
+            if (existing && !allExistingForOrg.some(record => record.id === existing.id)) {
+                allExistingForOrg.push(existing);
+            }
         }
 
         const { parsedDate, finalStatus } = deriveOpportunityTiming(opp, existing);
+        const nextUrl = candidateUrl || existing.url || organizationFallbackUrl;
+        const nextCanonicalUrl = getCanonicalOpportunityUrl(nextUrl) || existing.canonicalUrl || null;
         await prisma.opportunity.update({
             where: { id: existing.id },
             data: {
                 lastFetchedAt: new Date(),
                 deadline: parsedDate || existing.deadline,
                 status: finalStatus,
-                url: candidateUrl || existing.url || organizationFallbackUrl
+                url: nextUrl,
+                canonicalUrl: nextCanonicalUrl
             }
         });
     }
@@ -1580,9 +1623,11 @@ app.get('/api/cron/scrape-batch', async (req, res) => {
 app.post('/api/admin/opportunities', authenticateAdmin, async (req, res) => {
     try {
         const data = req.body;
+        const canonicalUrl = getCanonicalOpportunityUrl(data.url);
         const opp = await prisma.opportunity.create({
             data: {
                 ...data,
+                canonicalUrl,
                 source: 'manual',
                 verified: true, // Manual items are trusted implicitly
                 deadline: data.deadline ? new Date(data.deadline) : null
@@ -1590,6 +1635,9 @@ app.post('/api/admin/opportunities', authenticateAdmin, async (req, res) => {
         });
         res.json(opp);
     } catch (error) {
+        if (isCanonicalUrlUniqueViolation(error)) {
+            return res.status(409).json({ error: 'Opportunity with this canonical URL already exists.' });
+        }
         console.error('Error creating manual opportunity:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -1598,15 +1646,24 @@ app.post('/api/admin/opportunities', authenticateAdmin, async (req, res) => {
 app.put('/api/admin/opportunities/:id', authenticateAdmin, async (req, res) => {
     try {
         const data = req.body;
+        const updateData = {
+            ...data,
+            deadline: data.deadline ? new Date(data.deadline) : null
+        };
+
+        if (Object.prototype.hasOwnProperty.call(data, 'url')) {
+            updateData.canonicalUrl = getCanonicalOpportunityUrl(data.url);
+        }
+
         const opp = await prisma.opportunity.update({
             where: { id: req.params.id },
-            data: {
-                ...data,
-                deadline: data.deadline ? new Date(data.deadline) : null
-            }
+            data: updateData
         });
         res.json(opp);
     } catch (error) {
+        if (isCanonicalUrlUniqueViolation(error)) {
+            return res.status(409).json({ error: 'Opportunity with this canonical URL already exists.' });
+        }
         res.status(500).json({ error: error.message });
     }
 });

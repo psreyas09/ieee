@@ -26,6 +26,7 @@ model Opportunity {
   deadline       DateTime?
   eligibility    String?
   url            String?
+  canonicalUrl   String?      @unique(map: "unique_opportunity") @map("canonical_url")
   type           String       // Competition, Paper Contest, Grant, Hackathon, Fellowship, Workshop, Webinar, Other
   status         String       // Live, Upcoming, Closed
   organizationId String

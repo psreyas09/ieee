@@ -192,6 +192,17 @@ function reportMetrics() {
   setInterval(() => {
     const uptime = process.uptime();
     const memory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    const totalProcessed = metrics.processed;
+    const successRate = totalProcessed > 0
+      ? Number(((metrics.successful / totalProcessed) * 100).toFixed(1))
+      : 0;
+    const topErrorTypes = Object.entries(metrics.errors)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([errorType, count]) => ({ errorType, count }));
+    const playwrightUsagePercent = totalProcessed > 0
+      ? Number(((metrics.playwrightUsed / totalProcessed) * 100).toFixed(1))
+      : 0;
 
     log('info', 'Metrics', 'Scraper status', {
       uptime: `${Math.floor(uptime / 60)}m`,
@@ -211,6 +222,13 @@ function reportMetrics() {
         playwrightUsed: metricsWindow.playwrightUsed,
         failures: metricsWindow.failures,
       },
+    });
+
+    log('info', 'Metrics', 'Periodic summary', {
+      totalProcessed,
+      successRate,
+      topErrorTypes,
+      playwrightUsagePercent,
     });
 
     metricsWindow = {
