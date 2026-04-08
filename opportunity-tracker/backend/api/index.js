@@ -187,7 +187,18 @@ const getNormalizedOpportunityUrl = (value) => {
     if (typeof value !== 'string') return null;
     const cleaned = value.trim();
     if (!cleaned) return null;
-    return isValidHttpUrl(cleaned) ? cleaned : null;
+
+    try {
+        const parsed = new URL(cleaned);
+        parsed.hash = '';
+        parsed.search = '';
+        parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+            ? parsed.toString()
+            : null;
+    } catch {
+        return null;
+    }
 };
 
 const GENERIC_LISTING_PATHS = new Set([
@@ -312,9 +323,22 @@ const processScrapedOpportunities = async (organization, opportunities) => {
 
     for (const opp of opportunities) {
         const candidateUrl = await getValidatedOpportunityUrl(opp.url);
+        const normalizedTitle = String(opp.title || '').trim().toLowerCase();
 
         let existing = null;
         for (const record of allExistingForOrg) {
+            const recordUrl = getNormalizedOpportunityUrl(record.url);
+            if (candidateUrl && recordUrl && candidateUrl === recordUrl) {
+                existing = record;
+                break;
+            }
+
+            const recordTitle = String(record.title || '').trim().toLowerCase();
+            if (normalizedTitle && recordTitle && normalizedTitle === recordTitle) {
+                existing = record;
+                break;
+            }
+
             if (calculateSimilarity(opp.title, record.title) > SCRAPE_MATCH_THRESHOLD) {
                 existing = record;
                 break;
@@ -355,6 +379,34 @@ const processScrapedOpportunities = async (organization, opportunities) => {
     }
 
     return { opportunitiesFound: opportunities.length, opportunitiesAdded: addedCount };
+};
+
+const persistWorkerScrapeLog = async ({
+    organizationId,
+    status,
+    source = 'worker',
+    errorMessage = null,
+    opportunitiesFound = 0,
+    opportunitiesAdded = 0,
+}) => {
+    try {
+        await prisma.scrapeRunLog.create({
+            data: {
+                organizationId,
+                startedAt: new Date(),
+                endedAt: new Date(),
+                status,
+                errorMessage,
+                opportunitiesFound,
+                opportunitiesAdded,
+                source,
+            }
+        });
+    } catch (error) {
+        if (!isMissingScrapeRunLogTableError(error)) {
+            console.error('Failed to persist worker scrape log:', error);
+        }
+    }
 };
 
 const executeScrapeForOrganization = async (organization, source) => {
@@ -978,6 +1030,8 @@ app.post('/api/admin/scrape-result', authenticateScraperWorker, async (req, res)
         const sourceUrl = String(payload.sourceUrl || opportunity.url || '').trim();
         const organizationId = String(payload.organizationId || opportunity.organizationId || '').trim();
         const title = String(opportunity.title || '').trim();
+        const methodUsed = String(payload.methodUsed || 'unknown').trim().toLowerCase();
+        const fetchTimeMs = Number(payload.fetchTimeMs || payload.fetchTime || 0);
 
         if (!isValidHttpUrl(sourceUrl)) {
             return res.status(400).json({ error: 'sourceUrl must be a valid http(s) URL' });
@@ -1009,6 +1063,15 @@ app.post('/api/admin/scrape-result', authenticateScraperWorker, async (req, res)
 
         const result = await processScrapedOpportunities(organization, [normalizedOpportunity]);
 
+        await persistWorkerScrapeLog({
+            organizationId,
+            status: 'success',
+            source: 'worker',
+            errorMessage: `sourceUrl=${sourceUrl}; methodUsed=${methodUsed || 'unknown'}; fetchTimeMs=${Number.isFinite(fetchTimeMs) ? fetchTimeMs : 0}`,
+            opportunitiesFound: result.opportunitiesFound,
+            opportunitiesAdded: result.opportunitiesAdded,
+        });
+
         console.log('Scrape result ingested:', {
             organizationId,
             sourceUrl,
@@ -1025,6 +1088,41 @@ app.post('/api/admin/scrape-result', authenticateScraperWorker, async (req, res)
     } catch (error) {
         console.error('Error ingesting scrape result:', error);
         res.status(500).json({ error: 'Failed to ingest scrape result' });
+    }
+});
+
+app.post('/api/admin/scrape-failure', authenticateScraperWorker, async (req, res) => {
+    try {
+        const payload = req.body || {};
+        const sourceUrl = String(payload.sourceUrl || payload.url || '').trim();
+        const organizationId = String(payload.organizationId || '').trim();
+        const errorType = String(payload.errorType || 'unknown').trim();
+        const errorMessage = String(payload.errorMessage || payload.error || 'unknown').trim();
+        const methodUsed = String(payload.methodUsed || 'unknown').trim().toLowerCase();
+        const fetchTimeMs = Number(payload.fetchTimeMs || 0);
+
+        if (!organizationId) {
+            return res.status(400).json({ error: 'organizationId is required' });
+        }
+
+        const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+        if (!organization) {
+            return res.status(404).json({ error: 'Organization not found for organizationId' });
+        }
+
+        await persistWorkerScrapeLog({
+            organizationId,
+            status: 'failed',
+            source: 'worker',
+            errorMessage: `sourceUrl=${sourceUrl || 'n/a'}; errorType=${errorType}; methodUsed=${methodUsed}; fetchTimeMs=${Number.isFinite(fetchTimeMs) ? fetchTimeMs : 0}; error=${errorMessage}`,
+            opportunitiesFound: 0,
+            opportunitiesAdded: 0,
+        });
+
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Error ingesting scrape failure:', error);
+        res.status(500).json({ error: 'Failed to ingest scrape failure' });
     }
 });
 

@@ -31,6 +31,7 @@ const URL_SEEN_COOLDOWN_MS = Math.max(60000, parseInt(process.env.URL_SEEN_COOLD
 const ANTI_BOT_COOLDOWN_MS = Math.max(300000, parseInt(process.env.ANTI_BOT_COOLDOWN_MS || '21600000', 10));
 const REQUEST_DELAY_MIN_MS = Math.max(500, parseInt(process.env.REQUEST_DELAY_MIN_MS || '1500', 10));
 const REQUEST_DELAY_MAX_MS = Math.max(REQUEST_DELAY_MIN_MS + 250, parseInt(process.env.REQUEST_DELAY_MAX_MS || '4000', 10));
+const FETCH_HARD_TIMEOUT_MS = Math.max(10000, parseInt(process.env.FETCH_HARD_TIMEOUT_MS || '45000', 10));
 const BLOCKED_DOMAINS = new Set(
   String(process.env.BLOCKED_DOMAINS || '')
     .split(',')
@@ -338,6 +339,23 @@ async function sendResultToAPI(result, options = {}) {
   return false;
 }
 
+async function reportScrapeFailure(payload) {
+  try {
+    await axios.post(`${API_URL}/api/admin/scrape-failure`, payload, {
+      headers: {
+        Authorization: `Bearer ${API_SECRET}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 10000,
+    });
+  } catch (error) {
+    log('warn', 'API', 'Failed to report scrape failure', {
+      url: payload?.sourceUrl || payload?.url || 'n/a',
+      error: error.response?.status || error.message,
+    });
+  }
+}
+
 /**
  * Flush local queue periodically
  */
@@ -444,15 +462,23 @@ async function processURL(item) {
     log('info', 'Scraper', 'Processing URL', { url, organizationId, organizationName });
 
     // Fetch page with hybrid logic
-    const { html, methodUsed } = await fetchPage(url, {
+    const fetchAttempt = fetchPage(url, {
       proxyConfig,
       maxRetries: 1,
     });
 
+    const timeoutAttempt = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Hard fetch timeout after ${FETCH_HARD_TIMEOUT_MS}ms`)), FETCH_HARD_TIMEOUT_MS);
+    });
+
+    const { html, methodUsed } = await Promise.race([fetchAttempt, timeoutAttempt]);
+
     // Process HTML through pipeline
     const result = await processHTML(html, url);
     result.sourceUrl = url;
+    result.methodUsed = methodUsed;
     result.scrapedAt = new Date().toISOString();
+    result.fetchTimeMs = Date.now() - startTime;
     if (organizationId) {
       result.organizationId = organizationId;
       result.opportunity = {
@@ -516,6 +542,15 @@ async function processURL(item) {
     metricsWindow.failures++;
     metrics.totalFetchTime += fetchTime;
     metrics.errors[errorType] = (metrics.errors[errorType] || 0) + 1;
+
+    await reportScrapeFailure({
+      sourceUrl: url,
+      organizationId,
+      errorType,
+      errorMessage: error.message,
+      methodUsed: 'unknown',
+      fetchTimeMs: fetchTime,
+    });
 
     log('error', 'Scraper', 'Failed to process URL', {
       url,
