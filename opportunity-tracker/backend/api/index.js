@@ -49,6 +49,21 @@ const toOrganizationResponse = (org) => {
     };
 };
 
+const getOrganizationQueueUrls = (org) => {
+    const explicit = parseScrapeUrls(org?.scrapeUrl);
+    if (explicit.length > 0) return explicit;
+
+    const fallback = typeof org?.officialWebsite === 'string'
+        ? org.officialWebsite.trim()
+        : '';
+
+    if (fallback && isValidHttpUrl(fallback)) {
+        return [fallback];
+    }
+
+    return [];
+};
+
 const SCRAPE_QUEUE_COOLDOWN_MS = Math.max(60 * 1000, Number(process.env.SCRAPE_QUEUE_COOLDOWN_MS || 60 * 60 * 1000));
 const SCRAPE_QUEUE_ORG_LIMIT = Math.max(1, Number(process.env.SCRAPE_QUEUE_ORG_LIMIT || 5));
 const SCRAPE_QUEUE_URLS_PER_ORG = Math.max(1, Number(process.env.SCRAPE_QUEUE_URLS_PER_ORG || 2));
@@ -948,9 +963,9 @@ app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
         const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
         if (!org) return res.status(404).json({ error: 'Organization not found' });
 
-        const scrapeUrls = parseScrapeUrls(org.scrapeUrl);
+        const scrapeUrls = getOrganizationQueueUrls(org);
         if (scrapeUrls.length === 0) {
-            return res.status(400).json({ error: 'Organization has no scrape URL configured' });
+            return res.status(400).json({ error: 'Organization has no scrape URL or official website configured' });
         }
 
         const alreadyQueued = org.lastScrapedAt === null;
@@ -987,10 +1002,19 @@ app.get('/api/admin/scrape-queue', authenticateScraperWorker, async (req, res) =
         const rawCandidates = await prisma.organization.findMany({
             where: {
                 isActive: true,
-                scrapeUrl: { not: null },
-                OR: [
-                    { lastScrapedAt: null },
-                    { lastScrapedAt: { lt: cutoff } }
+                AND: [
+                    {
+                        OR: [
+                            { scrapeUrl: { not: null } },
+                            { officialWebsite: { not: null } }
+                        ]
+                    },
+                    {
+                        OR: [
+                            { lastScrapedAt: null },
+                            { lastScrapedAt: { lt: cutoff } }
+                        ]
+                    }
                 ]
             },
             orderBy: [
@@ -1002,6 +1026,7 @@ app.get('/api/admin/scrape-queue', authenticateScraperWorker, async (req, res) =
                 id: true,
                 name: true,
                 scrapeUrl: true,
+                officialWebsite: true,
                 lastScrapedAt: true
             }
         });
@@ -1032,7 +1057,7 @@ app.get('/api/admin/scrape-queue', authenticateScraperWorker, async (req, res) =
 
             if (claimed.count === 0) continue;
 
-            const urls = parseScrapeUrls(org.scrapeUrl).slice(0, SCRAPE_QUEUE_URLS_PER_ORG);
+            const urls = getOrganizationQueueUrls(org).slice(0, SCRAPE_QUEUE_URLS_PER_ORG);
             for (const url of urls) {
                 if (queueItems.length >= SCRAPE_QUEUE_TOTAL_URL_LIMIT) break;
 
@@ -1847,9 +1872,9 @@ app.post('/api/admin/organizations/:id/enqueue', authenticateAdmin, async (req, 
         const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
         if (!org) return res.status(404).json({ error: 'Organization not found' });
 
-        const scrapeUrls = parseScrapeUrls(org.scrapeUrl);
+        const scrapeUrls = getOrganizationQueueUrls(org);
         if (scrapeUrls.length === 0) {
-            return res.status(400).json({ error: 'Organization has no scrape URL configured' });
+            return res.status(400).json({ error: 'Organization has no scrape URL or official website configured' });
         }
 
         const updated = await prisma.organization.update({
