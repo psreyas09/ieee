@@ -286,10 +286,14 @@ export default function AdminDashboard() {
 
     const handleScrape = async (orgId, orgName) => {
         setScrapingId(orgId);
-        showToast(`Started scraping ${orgName}...`);
+        showToast(`Queueing ${orgName} for Railway worker...`);
         try {
             const result = await triggerScrape(orgId);
-            showToast(`Success! Found ${result.opportunitiesFound} items, added ${result.newAdded} new.`);
+            if (result?.alreadyQueued) {
+                showToast(`${orgName} is already queued. Worker will process it shortly.`);
+            } else {
+                showToast(`${orgName} queued. Worker pipeline (Axios + Playwright fallback) will process it.`);
+            }
             fetchData(); // refresh data
         } catch (error) {
             const msg = formatScrapeFailureMessage(error);
@@ -304,7 +308,7 @@ export default function AdminDashboard() {
     };
 
     const handleScrapeAll = async () => {
-        if (!confirm('This will sequentially scrape all organizations. It may take several minutes. Ensure your browser stays open. Proceed?')) return;
+        if (!confirm('This will queue all organizations for worker scraping. Processing is asynchronous. Proceed?')) return;
 
         setIsScrapingAll(true);
         let successCount = 0;
@@ -316,22 +320,22 @@ export default function AdminDashboard() {
 
             try {
                 setScrapingId(org.id);
-                const result = await triggerScrape(org.id);
+                await triggerScrape(org.id);
                 successCount++;
-                console.log(`Success scraping ${org.name}:`, result);
+                console.log(`Queued ${org.name} for worker scraping`);
             } catch (error) {
                 failCount++;
-                console.error(`Failed scraping ${org.name}:`, error);
+                console.error(`Failed queueing ${org.name}:`, error);
             }
 
-            // Wait 2 seconds between scrapes to respect Gemini rate limits
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Small delay keeps API requests smooth without changing worker concurrency.
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
 
         setScrapingId(null);
         setScrapeProgress(null);
         setIsScrapingAll(false);
-        showToast(`Scrape All Complete! Success: ${successCount}, Failed: ${failCount}`);
+        showToast(`Queueing complete! Enqueued: ${successCount}, Failed: ${failCount}`);
         fetchData();
     };
 

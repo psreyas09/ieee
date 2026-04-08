@@ -945,37 +945,32 @@ app.post('/api/admin/login', async (req, res) => {
 // Admin protected routes specific to organizations and scraping
 app.post('/api/admin/scrape/:id', authenticateAdmin, async (req, res) => {
     try {
-        const orgId = req.params.id;
-        const cooldownMs = 10 * 60 * 1000;
-        const organization = await prisma.organization.findUnique({
-            where: { id: orgId }
+        const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
+        if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+        const scrapeUrls = parseScrapeUrls(org.scrapeUrl);
+        if (scrapeUrls.length === 0) {
+            return res.status(400).json({ error: 'Organization has no scrape URL configured' });
+        }
+
+        const alreadyQueued = org.lastScrapedAt === null;
+        const updated = alreadyQueued
+            ? org
+            : await prisma.organization.update({
+                where: { id: req.params.id },
+                data: { lastScrapedAt: null }
+            });
+
+        return res.json({
+            success: true,
+            enqueued: true,
+            alreadyQueued,
+            mode: 'worker',
+            message: alreadyQueued
+                ? 'Organization is already queued for worker scraping'
+                : 'Organization enqueued for worker scraping',
+            organization: toOrganizationResponse(updated)
         });
-
-        if (!organization) return res.status(404).json({ error: 'Organization not found' });
-
-        // Check simple cooldown (10 minutes)
-        if (organization.lastScrapedAt) {
-            const elapsedMs = Date.now() - new Date(organization.lastScrapedAt).getTime();
-            if (elapsedMs < cooldownMs) {
-                const retryAfterSec = Math.max(1, Math.ceil((cooldownMs - elapsedMs) / 1000));
-                return res.status(429).json({
-                    error: 'Cooldown active. Try again later.',
-                    reason: 'cooldown',
-                    retryAfterSec,
-                    lastScrapedAt: organization.lastScrapedAt,
-                    organizationId: organization.id,
-                    organizationName: organization.name
-                });
-            }
-        }
-
-        const scrape = await executeScrapeForOrganization(organization, 'manual');
-
-        if (!scrape.success) {
-            return res.status(scrape.httpStatus || 500).json(scrape.payload);
-        }
-
-        res.json(scrape.payload);
 
     } catch (error) {
         console.error('Scraping error:', error);
