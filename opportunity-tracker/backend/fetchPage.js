@@ -127,7 +127,7 @@ async function fetchWithPlaywright(url, proxyConfig = {}) {
  *
  * @param {string} url - URL to fetch
  * @param {Object} options - { proxyConfig, retryCount }
- * @returns {Promise<string>} HTML content
+ * @returns {Promise<{html: string, methodUsed: 'axios' | 'playwright'}>} HTML content + method used
  */
 async function fetchPage(url, options = {}) {
   const { proxyConfig = {}, maxRetries = 1 } = options;
@@ -150,7 +150,7 @@ async function fetchPage(url, options = {}) {
         }
 
         console.log(`[fetchPage] ✓ Success with Axios`);
-        return html;
+        return { html, methodUsed: 'axios' };
       } catch (axiosError) {
         // Check for specific status codes that indicate blocking
         if (axiosError.response) {
@@ -180,7 +180,7 @@ async function fetchPage(url, options = {}) {
       try {
         const html = await fetchWithPlaywright(url, proxyConfig);
         console.log(`[fetchPage] ✓ Success with Playwright`);
-        return html;
+        return { html, methodUsed: 'playwright' };
       } catch (playwrightError) {
         console.error(`[fetchPage] Playwright also failed: ${playwrightError.message}`);
         lastError = playwrightError;

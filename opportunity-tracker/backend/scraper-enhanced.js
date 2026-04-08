@@ -31,6 +31,12 @@ const URL_SEEN_COOLDOWN_MS = Math.max(60000, parseInt(process.env.URL_SEEN_COOLD
 const ANTI_BOT_COOLDOWN_MS = Math.max(300000, parseInt(process.env.ANTI_BOT_COOLDOWN_MS || '21600000', 10));
 const REQUEST_DELAY_MIN_MS = Math.max(500, parseInt(process.env.REQUEST_DELAY_MIN_MS || '1500', 10));
 const REQUEST_DELAY_MAX_MS = Math.max(REQUEST_DELAY_MIN_MS + 250, parseInt(process.env.REQUEST_DELAY_MAX_MS || '4000', 10));
+const BLOCKED_DOMAINS = new Set(
+  String(process.env.BLOCKED_DOMAINS || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 // Proxy configuration
 const proxyConfig =
@@ -368,6 +374,21 @@ async function processURL(item) {
     };
   }
 
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (BLOCKED_DOMAINS.has(hostname)) {
+      log('warn', 'Scraper', 'Skipped due to blocked-domain policy', { url, hostname });
+      return {
+        url,
+        success: false,
+        error: 'domain_blocked',
+        fetchTime: 0,
+      };
+    }
+  } catch {
+    // URL parsing handled by downstream validation/fetch errors
+  }
+
   // Check for duplicates
   if (shouldSkipRecentlyProcessed(url)) {
     log('info', 'Scraper', 'Skipping recently processed URL', {
@@ -402,7 +423,7 @@ async function processURL(item) {
     log('info', 'Scraper', 'Processing URL', { url, organizationId, organizationName });
 
     // Fetch page with hybrid logic
-    const html = await fetchPage(url, {
+    const { html, methodUsed } = await fetchPage(url, {
       proxyConfig,
       maxRetries: 1,
     });
@@ -431,6 +452,15 @@ async function processURL(item) {
 
     metrics.totalFetchTime += fetchTime;
     markUrlProcessed(url);
+
+    log('info', 'Scraper', 'Scrape summary', {
+      url,
+      organizationId,
+      methodUsed,
+      itemsFound: Array.isArray(result?.opportunities) ? result.opportunities.length : 1,
+      delivered: success,
+      fetchTime,
+    });
 
     return {
       url,

@@ -91,7 +91,7 @@ async function processURL(url) {
     console.log(`\n[Scraper] Starting: ${url}`);
 
     // Fetch page with hybrid logic
-    const html = await fetchPage(url, {
+    const { html, methodUsed } = await fetchPage(url, {
       proxyConfig,
       maxRetries: 1,
     });
@@ -104,6 +104,13 @@ async function processURL(url) {
 
     // Send to backend API
     const success = await sendResultToAPI(result);
+
+    console.log('[Scraper] Scrape summary:', {
+      url,
+      methodUsed,
+      itemsFound: Array.isArray(result?.opportunities) ? result.opportunities.length : 1,
+      delivered: success,
+    });
 
     return {
       url,
