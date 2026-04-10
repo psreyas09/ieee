@@ -1,5 +1,24 @@
 # Web Scraper Implementation Summary
 
+## Important Status (April 2026)
+- This document includes historical implementation notes and legacy snippets.
+- Current deployment architecture is:
+   - Vercel API control plane + persistence.
+   - Railway worker runtime for actual scraping.
+   - Admin scrape action enqueues only; worker performs scrape.
+- Current runbook truth:
+   - `backend/RAILWAY_QUICK_START.md`
+   - `README.md`
+   - `DOCUMENTATION.md`
+
+## Current Critical Facts
+- Worker endpoints in use:
+   - `GET /api/admin/scrape-queue`
+   - `POST /api/admin/scrape-result`
+   - `POST /api/admin/scrape-failure`
+- Queue URL fallback uses `officialWebsite` when scrape URLs are absent.
+- Canonical URL dedup is enforced in DB via unique index `unique_opportunity`.
+
 ## What Was Built
 
 A **production-ready Node.js web scraping worker** designed for Railway deployment with:

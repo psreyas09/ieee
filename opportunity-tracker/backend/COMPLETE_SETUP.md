@@ -1,5 +1,20 @@
 # Complete Setup Guide: Railway Scraper + Vercel Backend
 
+## Important Status (April 2026)
+- This guide was written for an earlier integration stage and contains outdated setup/auth assumptions.
+- Current system state:
+  - Admin scrape does not scrape directly; it enqueues organization work.
+  - Railway worker performs scraping and reports success/failure telemetry.
+  - Queue fallback uses `officialWebsite` when explicit scrape URLs are missing.
+  - DB canonical URL uniqueness is enforced (`unique_opportunity`).
+
+For current setup/runbook, use:
+- `backend/RAILWAY_QUICK_START.md`
+- `README.md`
+- `DOCUMENTATION.md`
+
+Treat the remaining content below as historical reference only.
+
 ## Overview
 
 Your system will have:

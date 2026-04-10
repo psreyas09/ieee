@@ -2,6 +2,26 @@
 
 This file is a quick restart guide for future chats and contributors.
 
+## Current Stage (April 2026)
+- Source of truth architecture:
+  - Admin scrape action is enqueue-only (`POST /api/admin/scrape/:id`).
+  - Railway worker performs actual scraping (Axios first, Playwright fallback).
+  - Worker API endpoints: `GET /api/admin/scrape-queue`, `POST /api/admin/scrape-result`, `POST /api/admin/scrape-failure`.
+- Queue URL fallback:
+  - If an organization has no explicit scrape URL, worker queue uses `officialWebsite` when valid.
+- Dedup hard stop:
+  - DB has unique index `unique_opportunity` on `canonical_url`.
+  - Non-null canonical URL duplicates are blocked at DB level.
+- Dashboard stats note:
+  - Homepage stat cards are preference/persona filtered; they are not raw global DB totals.
+- Cost classification note:
+  - Award-like items now support richer labels (cash-prize / free-entry style), reducing false Paid tagging.
+
+## Operational Command Notes
+- Use local Prisma CLI from backend with env loaded when running migrations manually:
+  - `set -a && source backend/.env && set +a && ./backend/node_modules/.bin/prisma migrate deploy --schema /abs/path/to/backend/prisma/schema.prisma`
+- Avoid `npx prisma@latest ...` from repo root because Prisma 7 CLI behavior may not match current schema/runtime setup.
+
 ## Current State (March 2026)
 - Branch: `main`
 - Deployment target: Vercel (`https://ieee-eosin.vercel.app`)

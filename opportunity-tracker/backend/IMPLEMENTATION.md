@@ -1,5 +1,20 @@
 # Web Scraper Implementation - Final Delivery
 
+## Important Status (April 2026)
+- This file contains historical delivery details and includes outdated examples.
+- Current architecture in production:
+   - Admin scrape trigger is enqueue-only.
+   - Railway worker executes the hybrid scraper pipeline.
+   - Worker telemetry is posted to result/failure endpoints.
+   - Canonical URL uniqueness is enforced in DB (`unique_opportunity`).
+
+Use these docs as source of truth for current behavior:
+- `backend/RAILWAY_QUICK_START.md`
+- `README.md`
+- `DOCUMENTATION.md`
+
+If this file conflicts with the docs above, trust those docs.
+
 ## 📦 What You're Getting
 
 A complete, production-ready Node.js web scraping worker for Railway deployment that:

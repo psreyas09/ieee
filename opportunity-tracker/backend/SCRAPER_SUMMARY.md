@@ -1,5 +1,17 @@
 # Scraper Summary (Current State)
 
+## April 2026 Sync Notes
+- Admin trigger behavior changed:
+  - `POST /api/admin/scrape/:id` now enqueues for worker processing only.
+  - Vercel API no longer performs direct Playwright scraping for admin button flow.
+- Worker execution path:
+  - Railway worker owns hybrid execution (`Axios -> Playwright fallback`).
+  - Failure telemetry endpoint in use: `POST /api/admin/scrape-failure`.
+- Queue URL selection:
+  - Explicit scrape URLs first; valid `officialWebsite` is fallback when scrape URLs are missing.
+- Dedup hardening:
+  - Canonical URL uniqueness is enforced at DB level via `unique_opportunity` index.
+
 ## Overview
 This project now runs a production-style scraping pipeline with:
 - Vercel API as the control plane and persistence layer
@@ -11,6 +23,7 @@ This project now runs a production-style scraping pipeline with:
 - Queue source: organizations in DB with scrape URLs and cooldown eligibility
 - Queue endpoint: GET /api/admin/scrape-queue
 - Result endpoint: POST /api/admin/scrape-result
+- Failure endpoint: POST /api/admin/scrape-failure
 - Worker loop: queue-driven sleep loop (no fixed cron spam)
 - Browser lifecycle: one reusable browser instance, page-per-request
 
@@ -95,11 +108,14 @@ Can be overridden via:
 - Anti-bot classification and cooldown skipping
 - Browser restart recovery after disconnect
 - Organization delete and enqueue admin flows
+- Enqueue fallback to `officialWebsite` when explicit scrape URLs are absent
+- Worker telemetry persistence (method used / failure type context in scrape logs)
 
 ## Known Limitations
 - Some IEEE domains are heavily anti-bot protected and may fail even with Playwright
 - Local retry queue file is non-durable across container restarts
 - Worker currently uses mock HTML-to-opportunity extraction in scraper-enhanced.js unless customized
+- SQL unique index allows multiple `NULL` canonical URLs by Postgres design; non-null values are still protected
 
 ## Recommended Next Improvements
 1. Add durable DB-backed retry queue (replace local file fallback)

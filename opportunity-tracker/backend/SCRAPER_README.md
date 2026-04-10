@@ -1,5 +1,24 @@
 # Railway Playwright Web Scraper - Production Ready Architecture
 
+## Important Status (April 2026)
+- This file contains useful background, but some sections below are legacy planning notes.
+- Authoritative current behavior:
+  - Admin scrape button enqueues work; worker executes scraping.
+  - Worker endpoints are protected by `SCRAPER_API_SECRET`-based worker auth.
+  - Queue fallback uses `officialWebsite` when explicit scrape URLs are absent.
+  - DB dedup uses canonical URL uniqueness (`unique_opportunity`).
+- Prefer these docs for current runbook truth:
+  - `backend/RAILWAY_QUICK_START.md`
+  - `README.md`
+  - `DOCUMENTATION.md`
+
+## Current API Contract (Use This)
+- `GET /api/admin/scrape-queue` (worker auth)
+- `POST /api/admin/scrape-result` (worker auth)
+- `POST /api/admin/scrape-failure` (worker auth)
+
+Do not treat examples below that use legacy auth semantics as source of truth.
+
 ## Overview
 A standalone Node.js worker that implements hybrid HTTP fetching (Axios + Playwright) with anti-bot detection, proxy support, and Railway deployment compatibility.
 
