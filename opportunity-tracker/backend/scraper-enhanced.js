@@ -189,6 +189,9 @@ function categorizeError(error) {
   ) {
     return 'browser_error';
   }
+  if (message.includes('status code 403') || message.includes('status code 429')) {
+    return 'anti_bot';
+  }
   if (message.includes('block page detected') || message.includes('playwright fetch blocked')) return 'anti_bot';
   if (error.response?.status >= 500) return 'api_error';
   if (message.includes('parse')) return 'parse_error';

@@ -172,22 +172,22 @@ async function fetchPage(url, options = {}) {
 
           if ([403, 429, 401, 503].includes(status)) {
             console.log(`[fetchPage] HTTP ${status} - falling back to Playwright`);
-            throw axiosError;
+          } else {
+            // Also check if response body is a block page
+            const html = axiosError.response.data;
+            if (typeof html === 'string' && isBlockPage(html)) {
+              console.log(`[fetchPage] Block page in response, falling back to Playwright`);
+            } else {
+              // Non-blocking HTTP error: surface it to caller.
+              throw axiosError;
+            }
           }
-
-          // Also check if response body is a block page
-          const html = axiosError.response.data;
-          if (typeof html === 'string' && isBlockPage(html)) {
-            console.log(`[fetchPage] Block page in response, falling back to Playwright`);
-            throw axiosError;
-          }
-
-          // Re-throw if it's a real error
-          throw axiosError;
+        } else {
+          // Network error or timeout, try Playwright
+          console.log(`[fetchPage] Axios failed (${axiosError.message}), trying Playwright`);
         }
 
-        // Network error or timeout, try Playwright
-        console.log(`[fetchPage] Axios failed (${axiosError.message}), trying Playwright`);
+        // If we reached here, fallback to Playwright for this attempt.
       }
 
       // Fallback to Playwright
