@@ -148,12 +148,13 @@ async function fetchPage(url, options = {}) {
 
   let lastError = null;
 
-  const withFetchPrefix = (err) => {
+  const withFetchPrefix = (err, extra = {}) => {
     const message = String(err?.message || 'Unknown fetch error');
-    if (message.startsWith(`Failed to fetch ${url}`)) {
-      return new Error(message);
-    }
-    return new Error(`Failed to fetch ${url}: ${message}`);
+    const wrapped = message.startsWith(`Failed to fetch ${url}`)
+      ? new Error(message)
+      : new Error(`Failed to fetch ${url}: ${message}`);
+    Object.assign(wrapped, err, extra);
+    return wrapped;
   };
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -206,6 +207,9 @@ async function fetchPage(url, options = {}) {
       } catch (playwrightError) {
         console.error(`[fetchPage] Playwright also failed: ${playwrightError.message}`);
         lastError = playwrightError;
+        playwrightError.fetchMethod = 'playwright';
+        playwrightError.fallbackMethod = 'playwright';
+        playwrightError.attemptedPlaywright = true;
 
         if (isBrowserClosedError(playwrightError)) {
           console.log('[fetchPage] Browser closed detected, restarting browser manager...');
@@ -217,7 +221,11 @@ async function fetchPage(url, options = {}) {
         }
 
         if (isAntiBotError(playwrightError)) {
-          throw withFetchPrefix(playwrightError);
+          throw withFetchPrefix(playwrightError, {
+            fetchMethod: 'playwright',
+            fallbackMethod: 'playwright',
+            attemptedPlaywright: true,
+          });
         }
 
         // If this was the last attempt, throw
@@ -234,7 +242,7 @@ async function fetchPage(url, options = {}) {
       lastError = error;
 
       if (isAntiBotError(error)) {
-        throw withFetchPrefix(error);
+        throw withFetchPrefix(error, error.attemptedPlaywright ? { attemptedPlaywright: true } : {});
       }
 
       if (attempt === maxRetries) {

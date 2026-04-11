@@ -64,6 +64,7 @@ let metrics = {
   successful: 0,
   failed: 0,
   axiosSuccess: 0,
+  playwrightAttempts: 0,
   playwrightUsed: 0,
   totalFetchTime: 0,
   errors: {},
@@ -71,6 +72,7 @@ let metrics = {
 
 let metricsWindow = {
   axiosSuccess: 0,
+  playwrightAttempts: 0,
   playwrightUsed: 0,
   failures: 0,
 };
@@ -226,6 +228,16 @@ function clearDomainFailure(hostname) {
   }
 }
 
+function didAttemptPlaywright(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return Boolean(
+    error?.fetchMethod === 'playwright' ||
+    error?.fallbackMethod === 'playwright' ||
+    error?.attemptedPlaywright ||
+    message.includes('playwright')
+  );
+}
+
 /**
  * Categorize errors for better debugging
  */
@@ -268,7 +280,7 @@ function reportMetrics() {
       .slice(0, 3)
       .map(([errorType, count]) => ({ errorType, count }));
     const playwrightUsagePercent = totalProcessed > 0
-      ? Number(((metrics.playwrightUsed / totalProcessed) * 100).toFixed(1))
+      ? Number(((metrics.playwrightAttempts / totalProcessed) * 100).toFixed(1))
       : 0;
 
     log('info', 'Metrics', 'Scraper status', {
@@ -278,6 +290,7 @@ function reportMetrics() {
       successful: metrics.successful,
       failed: metrics.failed,
       axiosSuccess: metrics.axiosSuccess,
+      playwrightAttempts: metrics.playwrightAttempts,
       playwrightUsed: metrics.playwrightUsed,
       avgFetchMs:
         metrics.processed > 0
@@ -286,6 +299,7 @@ function reportMetrics() {
       errorTypes: metrics.errors,
       windowSummary: {
         axiosSuccess: metricsWindow.axiosSuccess,
+        playwrightAttempts: metricsWindow.playwrightAttempts,
         playwrightUsed: metricsWindow.playwrightUsed,
         failures: metricsWindow.failures,
       },
@@ -300,6 +314,7 @@ function reportMetrics() {
 
     metricsWindow = {
       axiosSuccess: 0,
+      playwrightAttempts: 0,
       playwrightUsed: 0,
       failures: 0,
     };
@@ -639,6 +654,8 @@ async function processURL(item) {
     }
 
     if (methodUsed === 'playwright') {
+      metrics.playwrightAttempts++;
+      metricsWindow.playwrightAttempts++;
       metrics.playwrightUsed++;
       metricsWindow.playwrightUsed++;
     }
@@ -665,6 +682,11 @@ async function processURL(item) {
   } catch (error) {
     const fetchTime = Date.now() - startTime;
     const errorType = categorizeError(error);
+
+    if (didAttemptPlaywright(error)) {
+      metrics.playwrightAttempts++;
+      metricsWindow.playwrightAttempts++;
+    }
 
     if (errorType === 'anti_bot') {
       markAntiBotBlocked(url);
