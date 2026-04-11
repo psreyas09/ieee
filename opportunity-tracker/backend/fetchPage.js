@@ -148,6 +148,14 @@ async function fetchPage(url, options = {}) {
 
   let lastError = null;
 
+  const withFetchPrefix = (err) => {
+    const message = String(err?.message || 'Unknown fetch error');
+    if (message.startsWith(`Failed to fetch ${url}`)) {
+      return new Error(message);
+    }
+    return new Error(`Failed to fetch ${url}: ${message}`);
+  };
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       console.log(`[fetchPage] Attempt ${attempt + 1} for ${url}`);
@@ -209,7 +217,7 @@ async function fetchPage(url, options = {}) {
         }
 
         if (isAntiBotError(playwrightError)) {
-          throw new Error(`Failed to fetch ${url}: ${playwrightError.message}`);
+          throw withFetchPrefix(playwrightError);
         }
 
         // If this was the last attempt, throw
@@ -226,7 +234,7 @@ async function fetchPage(url, options = {}) {
       lastError = error;
 
       if (isAntiBotError(error)) {
-        throw new Error(`Failed to fetch ${url}: ${error.message}`);
+        throw withFetchPrefix(error);
       }
 
       if (attempt === maxRetries) {
