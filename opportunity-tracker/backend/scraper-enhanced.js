@@ -12,6 +12,7 @@
 require('dotenv').config();
 const fs = require('fs').promises;
 const axios = require('axios');
+const cheerio = require('cheerio');
 const path = require('path');
 const browserManager = require('./browserManager');
 const { fetchPage } = require('./fetchPage');
@@ -268,20 +269,53 @@ async function healthCheckBrowser() {
   }
 }
 
+function normalizeWhitespace(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function cleanTitle(value) {
+  const title = normalizeWhitespace(value)
+    .replace(/\s*[\-|\u2013\u2014]\s*(IEEE|Institute of Electrical and Electronics Engineers).*$/i, '')
+    .replace(/\s*\|\s*Home\s*$/i, '')
+    .trim();
+  return title;
+}
+
 /**
- * Mock function to process HTML
+ * Lightweight HTML extraction used by worker mode.
+ * This avoids placeholder rows when the full AI extractor is not wired in this path.
  */
 async function processHTML(html, url) {
   log('info', 'Processing', 'Analyzing HTML', { url });
 
-  // IMPLEMENT: Replace with real Cheerio + Gemini pipeline
+  const $ = cheerio.load(String(html || ''));
+  $('script, style, noscript, nav, footer, header').remove();
+
+  const pageTitle = cleanTitle($('title').first().text());
+  const h1Title = cleanTitle($('h1').first().text());
+  const fallbackTitle = (() => {
+    try {
+      const parsed = new URL(url);
+      return cleanTitle(parsed.hostname.replace(/^www\./i, ''));
+    } catch {
+      return 'Untitled Opportunity';
+    }
+  })();
+
+  const title = pageTitle || h1Title || fallbackTitle;
+
+  const description = normalizeWhitespace($('body').text()).slice(0, 2000);
+  if (!description || description.length < 40) {
+    throw new Error('parse_error: insufficient readable content extracted');
+  }
+
   return {
-    title: 'Extracted Title',
-    description: 'Extracted description from HTML',
+    title,
+    description,
     opportunity: {
       url,
-      title: 'Sample Opportunity',
-      description: 'Sample description',
+      title,
+      description,
       deadline: null,
       cost: 'unspecified',
     },
