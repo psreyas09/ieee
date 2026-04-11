@@ -28,7 +28,6 @@ class BrowserManager {
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage', // Important for Railway/Linux environments
           '--disable-gpu',
-          '--single-process',
         ],
       };
 
@@ -99,8 +98,14 @@ class BrowserManager {
     }
 
     try {
-      // Create a page using default context
-      const page = await this.browser.newPage();
+      // Use an isolated context per page to keep errors contained between attempts.
+      const context = await this.browser.newContext({
+        ignoreHTTPSErrors: true,
+        userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      });
+
+      const page = await context.newPage();
 
       // Set realistic timing
       page.setDefaultTimeout(30000); // 30 second timeout
@@ -119,7 +124,9 @@ class BrowserManager {
   async closePage(page) {
     if (page) {
       try {
+        const context = page.context();
         await page.close();
+        await context.close();
       } catch (error) {
         console.warn('[BrowserManager] Warning closing page:', error.message);
       }

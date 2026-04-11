@@ -33,6 +33,8 @@ const ANTI_BOT_COOLDOWN_MS = Math.max(300000, parseInt(process.env.ANTI_BOT_COOL
 const REQUEST_DELAY_MIN_MS = Math.max(500, parseInt(process.env.REQUEST_DELAY_MIN_MS || '1500', 10));
 const REQUEST_DELAY_MAX_MS = Math.max(REQUEST_DELAY_MIN_MS + 250, parseInt(process.env.REQUEST_DELAY_MAX_MS || '4000', 10));
 const FETCH_HARD_TIMEOUT_MS = Math.max(10000, parseInt(process.env.FETCH_HARD_TIMEOUT_MS || '45000', 10));
+const DOMAIN_SUPPRESS_FAILURE_THRESHOLD = Math.max(2, parseInt(process.env.DOMAIN_SUPPRESS_FAILURE_THRESHOLD || '3', 10));
+const DOMAIN_SUPPRESS_COOLDOWN_MS = Math.max(300000, parseInt(process.env.DOMAIN_SUPPRESS_COOLDOWN_MS || String(6 * 60 * 60 * 1000), 10));
 const BLOCKED_DOMAINS = new Set(
   String(process.env.BLOCKED_DOMAINS || '')
     .split(',')
@@ -53,6 +55,7 @@ const proxyConfig =
 // State management
 const processedUrlTimestamps = new Map(); // URL -> last processed timestamp
 const blockedUrlCooldown = new Map(); // URL -> blockedUntil timestamp
+const domainSuppressionState = new Map(); // hostname -> { failures, blockedUntil, lastErrorType }
 const resultsQueuePath = path.join(__dirname, '.scraper-queue.jsonl');
 let lastBrowserCheck = Date.now();
 let isShuttingDown = false;
@@ -175,6 +178,54 @@ function markAntiBotBlocked(url) {
   blockedUrlCooldown.set(url, Date.now() + ANTI_BOT_COOLDOWN_MS);
 }
 
+function isDomainTemporarilySuppressed(hostname) {
+  if (!hostname) return false;
+  const state = domainSuppressionState.get(hostname);
+  if (!state?.blockedUntil) return false;
+
+  if (Date.now() >= state.blockedUntil) {
+    domainSuppressionState.delete(hostname);
+    return false;
+  }
+
+  return true;
+}
+
+function markDomainFailure(hostname, errorType) {
+  if (!hostname) return;
+  const suppressible = new Set(['anti_bot', 'browser_error', 'cert_error']);
+  if (!suppressible.has(errorType)) return;
+
+  const now = Date.now();
+  const prev = domainSuppressionState.get(hostname) || { failures: 0, blockedUntil: 0, lastErrorType: null };
+  const failures = prev.failures + 1;
+  const shouldSuppress = failures >= DOMAIN_SUPPRESS_FAILURE_THRESHOLD;
+  const blockedUntil = shouldSuppress ? now + DOMAIN_SUPPRESS_COOLDOWN_MS : 0;
+
+  domainSuppressionState.set(hostname, {
+    failures,
+    blockedUntil,
+    lastErrorType: errorType,
+  });
+
+  if (shouldSuppress) {
+    log('warn', 'Suppression', 'Temporarily suppressing domain after repeated failures', {
+      hostname,
+      failures,
+      threshold: DOMAIN_SUPPRESS_FAILURE_THRESHOLD,
+      cooldownMs: DOMAIN_SUPPRESS_COOLDOWN_MS,
+      lastErrorType: errorType,
+    });
+  }
+}
+
+function clearDomainFailure(hostname) {
+  if (!hostname) return;
+  if (domainSuppressionState.has(hostname)) {
+    domainSuppressionState.delete(hostname);
+  }
+}
+
 /**
  * Categorize errors for better debugging
  */
@@ -191,6 +242,9 @@ function categorizeError(error) {
   }
   if (message.includes('status code 403') || message.includes('status code 429')) {
     return 'anti_bot';
+  }
+  if (message.includes('err_cert') || message.includes('certificate') || message.includes('altnames')) {
+    return 'cert_error';
   }
   if (message.includes('block page detected') || message.includes('playwright fetch blocked')) return 'anti_bot';
   if (error.response?.status >= 500) return 'api_error';
@@ -467,6 +521,7 @@ async function processURL(item) {
   const url = typeof item === 'string' ? item : String(item?.url || '').trim();
   const organizationId = typeof item === 'object' ? item.organizationId : null;
   const organizationName = typeof item === 'object' ? item.organizationName : null;
+  let hostname = null;
 
   if (!url) {
     return {
@@ -478,7 +533,7 @@ async function processURL(item) {
   }
 
   try {
-    const hostname = new URL(url).hostname.toLowerCase();
+    hostname = new URL(url).hostname.toLowerCase();
     if (BLOCKED_DOMAINS.has(hostname)) {
       log('warn', 'Scraper', 'Skipped due to blocked-domain policy', { url, hostname });
       return {
@@ -490,6 +545,22 @@ async function processURL(item) {
     }
   } catch {
     // URL parsing handled by downstream validation/fetch errors
+  }
+
+  if (isDomainTemporarilySuppressed(hostname)) {
+    const blockedUntil = domainSuppressionState.get(hostname)?.blockedUntil || 0;
+    const remainingMs = Math.max(0, blockedUntil - Date.now());
+    log('warn', 'Suppression', 'Skipped due to temporary domain suppression', {
+      url,
+      hostname,
+      remainingMs,
+    });
+    return {
+      url,
+      success: false,
+      error: 'domain_temporarily_suppressed',
+      fetchTime: 0,
+    };
   }
 
   // Check for duplicates
@@ -574,6 +645,7 @@ async function processURL(item) {
 
     metrics.totalFetchTime += fetchTime;
     markUrlProcessed(url);
+    clearDomainFailure(hostname);
 
     log('info', 'Scraper', 'Scrape summary', {
       url,
@@ -601,6 +673,8 @@ async function processURL(item) {
         nextRetryInMs: ANTI_BOT_COOLDOWN_MS,
       });
     }
+
+    markDomainFailure(hostname, errorType);
 
     metrics.failed++;
     metricsWindow.failures++;
