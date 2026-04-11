@@ -12,7 +12,7 @@ const { fetchPage } = require('./fetchPage');
 
 // Configuration from environment
 const API_URL = process.env.API_URL || 'http://localhost:3000';
-const API_SECRET = process.env.API_SECRET || '';
+const API_SECRET = process.env.SCRAPER_API_SECRET || process.env.API_SECRET || '';
 const PROXY_SERVER = process.env.PROXY_SERVER || null;
 const PROXY_USERNAME = process.env.PROXY_USERNAME || null;
 const PROXY_PASSWORD = process.env.PROXY_PASSWORD || null;
@@ -113,7 +113,19 @@ async function sendResultToAPI(result) {
 /**
  * Process a single URL: fetch, extract, send to API
  */
-async function processURL(url) {
+async function processURL(item) {
+  const url = typeof item === 'string' ? item : String(item?.url || '').trim();
+  const organizationId = typeof item === 'object' ? item.organizationId : null;
+
+  if (!url) {
+    return {
+      url: '',
+      success: false,
+      error: 'invalid_queue_item',
+      fetchTime: 0,
+    };
+  }
+
   const startTime = Date.now();
 
   try {
@@ -130,6 +142,17 @@ async function processURL(url) {
 
     // Process HTML through pipeline
     const result = await processHTML(html, url);
+    result.sourceUrl = url;
+    result.methodUsed = methodUsed;
+    result.scrapedAt = new Date().toISOString();
+    result.fetchTimeMs = Date.now() - startTime;
+    if (organizationId) {
+      result.organizationId = organizationId;
+      result.opportunity = {
+        ...result.opportunity,
+        organizationId,
+      };
+    }
 
     // Send to backend API
     const success = await sendResultToAPI(result);

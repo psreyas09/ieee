@@ -19,7 +19,7 @@ const { fetchPage } = require('./fetchPage');
 
 // Configuration from environment
 const API_URL = process.env.API_URL || 'http://localhost:3000';
-const API_SECRET = process.env.API_SECRET || '';
+const API_SECRET = process.env.SCRAPER_API_SECRET || process.env.API_SECRET || '';
 const PROXY_SERVER = process.env.PROXY_SERVER || null;
 const PROXY_USERNAME = process.env.PROXY_USERNAME || null;
 const PROXY_PASSWORD = process.env.PROXY_PASSWORD || null;
