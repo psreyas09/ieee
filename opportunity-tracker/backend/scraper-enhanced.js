@@ -179,10 +179,19 @@ function markAntiBotBlocked(url) {
  * Categorize errors for better debugging
  */
 function categorizeError(error) {
+  const message = String(error?.message || '').toLowerCase();
+
   if (error.code === 'ETIMEDOUT') return 'timeout';
-  if (error.message.includes('block')) return 'anti_bot';
+  if (
+    message.includes('target page, context or browser has been closed') ||
+    message.includes('browser.newpage') ||
+    message.includes('browser has been closed')
+  ) {
+    return 'browser_error';
+  }
+  if (message.includes('block page detected') || message.includes('playwright fetch blocked')) return 'anti_bot';
   if (error.response?.status >= 500) return 'api_error';
-  if (error.message.includes('parse')) return 'parse_error';
+  if (message.includes('parse')) return 'parse_error';
   return 'network_error';
 }
 

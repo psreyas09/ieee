@@ -38,9 +38,19 @@ function isBlockPage(html) {
 
   // Some sites return tiny interstitial/challenge pages with HTTP 200.
   const normalized = String(html).trim();
-  const suspiciouslySmallHtml = normalized.length > 0 && normalized.length < 500;
+  const looksLikeHtml = /<\s*!doctype|<\s*html|<\s*head|<\s*body/i.test(normalized);
+  const suspiciouslySmallHtml = looksLikeHtml && normalized.length > 0 && normalized.length < 500;
 
   return suspiciouslySmallHtml || BLOCK_PATTERNS.some(pattern => pattern.test(normalized));
+}
+
+function isBrowserClosedError(error) {
+  const message = String(error?.message || '');
+  return (
+    message.includes('Target page, context or browser has been closed') ||
+    message.includes('Browser has been closed') ||
+    message.includes('browser.newPage')
+  );
 }
 
 function isAntiBotError(error) {
@@ -110,7 +120,11 @@ async function fetchWithPlaywright(url, proxyConfig = {}) {
 
     return html;
   } catch (error) {
-    if (isBlockPage(error?.message) || isAntiBotError(error)) {
+    if (isBrowserClosedError(error)) {
+      throw new Error(`Playwright browser closed: ${error.message}`);
+    }
+
+    if (isAntiBotError(error)) {
       throw new Error(`Playwright fetch blocked: ${error.message}`);
     }
     throw new Error(`Playwright fetch failed: ${error.message}`);
@@ -184,6 +198,15 @@ async function fetchPage(url, options = {}) {
       } catch (playwrightError) {
         console.error(`[fetchPage] Playwright also failed: ${playwrightError.message}`);
         lastError = playwrightError;
+
+        if (isBrowserClosedError(playwrightError)) {
+          console.log('[fetchPage] Browser closed detected, restarting browser manager...');
+          try {
+            await browserManager.restart(proxyConfig);
+          } catch (restartError) {
+            console.error(`[fetchPage] Browser restart failed: ${restartError.message}`);
+          }
+        }
 
         if (isAntiBotError(playwrightError)) {
           throw new Error(`Failed to fetch ${url}: ${playwrightError.message}`);

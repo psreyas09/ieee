@@ -18,6 +18,7 @@ class BrowserManager {
    */
   async initialize(proxyConfig = {}) {
     try {
+      this.isShuttingDown = false;
       console.log('[BrowserManager] Initializing Chromium browser...');
 
       const launchOptions = {
@@ -150,7 +151,19 @@ class BrowserManager {
       }
     } catch (error) {
       console.error('[BrowserManager] Error during shutdown:', error.message);
+    } finally {
+      this.browser = null;
+      this.isShuttingDown = false;
     }
+  }
+
+  /**
+   * Restart browser process after crash/disconnect.
+   */
+  async restart(proxyConfig = {}) {
+    await this.shutdown();
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return this.initialize(proxyConfig);
   }
 }
 
