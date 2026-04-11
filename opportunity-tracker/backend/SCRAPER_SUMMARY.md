@@ -114,13 +114,13 @@ Can be overridden via:
 ## Known Limitations
 - Some IEEE domains are heavily anti-bot protected and may fail even with Playwright
 - Local retry queue file is non-durable across container restarts
-- Worker currently uses mock HTML-to-opportunity extraction in scraper-enhanced.js unless customized
+- Lightweight extraction can miss structured fields (deadline/eligibility/cost nuances) without a full AI parsing pipeline
 - SQL unique index allows multiple `NULL` canonical URLs by Postgres design; non-null values are still protected
 
 ## Recommended Next Improvements
 1. Add durable DB-backed retry queue (replace local file fallback)
 2. Add blocked-domain backoff persistence (DB)
-3. Replace mock processHTML with full Cheerio + Gemini extraction pipeline
+3. Upgrade extraction to full Cheerio + Gemini structured parsing pipeline
 4. Add dashboard controls for enqueue and block cooldown insights
 
 ## Quick Validation Checklist

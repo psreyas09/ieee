@@ -6,6 +6,7 @@
 
 require('dotenv').config();
 const axios = require('axios');
+const cheerio = require('cheerio');
 const browserManager = require('./browserManager');
 const { fetchPage } = require('./fetchPage');
 
@@ -31,24 +32,52 @@ const proxyConfig =
       }
     : {};
 
+function normalizeWhitespace(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function cleanTitle(value) {
+  const title = normalizeWhitespace(value)
+    .replace(/\s*[\-|\u2013\u2014]\s*(IEEE|Institute of Electrical and Electronics Engineers).*$/i, '')
+    .replace(/\s*\|\s*Home\s*$/i, '')
+    .trim();
+  return title;
+}
+
 /**
- * Mock function to process HTML (replace with actual Cheerio + Gemini pipeline)
- * In production, this would:
- * 1. Parse HTML with Cheerio
- * 2. Extract relevant data
- * 3. Send to Gemini for structured output
+ * Lightweight HTML extraction used by the basic worker.
  */
 async function processHTML(html, url) {
   console.log(`[Scraper] Processing HTML for: ${url}`);
 
-  // Mock processing - replace with real pipeline
+  const $ = cheerio.load(String(html || ''));
+  $('script, style, noscript, nav, footer, header').remove();
+
+  const pageTitle = cleanTitle($('title').first().text());
+  const h1Title = cleanTitle($('h1').first().text());
+  const fallbackTitle = (() => {
+    try {
+      const parsed = new URL(url);
+      return cleanTitle(parsed.hostname.replace(/^www\./i, ''));
+    } catch {
+      return 'Untitled Opportunity';
+    }
+  })();
+
+  const title = pageTitle || h1Title || fallbackTitle;
+  const description = normalizeWhitespace($('body').text()).slice(0, 2000);
+
+  if (!description || description.length < 40) {
+    throw new Error('parse_error: insufficient readable content extracted');
+  }
+
   return {
-    title: 'Extracted Title',
-    description: 'Extracted description from HTML',
+    title,
+    description,
     opportunity: {
       url,
-      title: 'Sample Opportunity',
-      description: 'Sample description',
+      title,
+      description,
       deadline: null,
       cost: 'unspecified',
     },
@@ -181,21 +210,22 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const randomDelay = (minMs, maxMs) => Math.floor(minMs + Math.random() * (maxMs - minMs));
 
 /**
- * Fetch list of URLs from backend API to scrape
- * (In production, this would retrieve a queue of pending URLs)
+ * Fetch list of URLs from backend API to scrape.
  */
 async function fetchURLQueue() {
   try {
     console.log('[Scraper] Fetching URL queue from API...');
 
-    // Mock implementation - replace with actual API call
-    // const response = await axios.get(`${API_URL}/api/admin/scrape-queue`, {
-    //   headers: { Authorization: `Bearer ${API_SECRET}` },
-    // });
-    // return response.data.urls || [];
+    const response = await axios.get(`${API_URL}/api/admin/scrape-queue`, {
+      headers: { Authorization: `Bearer ${API_SECRET}` },
+      timeout: 10000,
+    });
 
-    // For demo, return empty to avoid actual scraping
-    return [];
+    const items = Array.isArray(response.data?.items)
+      ? response.data.items
+      : (response.data?.urls || []).map(url => ({ url }));
+
+    return items;
   } catch (error) {
     console.error('[Scraper] Failed to fetch URL queue:', error.message);
     return [];
