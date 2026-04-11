@@ -378,6 +378,7 @@ const processScrapedOpportunities = async (organization, opportunities) => {
             const { parsedDate, finalStatus } = deriveOpportunityTiming(opp);
             const nextUrl = candidateUrl || organizationFallbackUrl;
             const nextCanonicalUrl = getCanonicalOpportunityUrl(nextUrl);
+            const nextTitle = String(opp.title || '').trim();
             let created = null;
 
             try {
@@ -401,8 +402,11 @@ const processScrapedOpportunities = async (organization, opportunities) => {
                     throw error;
                 }
 
-                existing = await prisma.opportunity.findUnique({
-                    where: { canonicalUrl: nextCanonicalUrl }
+                existing = await prisma.opportunity.findFirst({
+                    where: {
+                        canonicalUrl: nextCanonicalUrl,
+                        title: nextTitle
+                    }
                 });
             }
 
@@ -1644,9 +1648,11 @@ app.post('/api/admin/opportunities', authenticateAdmin, async (req, res) => {
     try {
         const data = req.body;
         const canonicalUrl = getCanonicalOpportunityUrl(data.url);
+        const title = String(data.title || '').trim();
         const opp = await prisma.opportunity.create({
             data: {
                 ...data,
+                title,
                 canonicalUrl,
                 source: 'manual',
                 verified: true, // Manual items are trusted implicitly
@@ -1656,7 +1662,7 @@ app.post('/api/admin/opportunities', authenticateAdmin, async (req, res) => {
         res.json(opp);
     } catch (error) {
         if (isCanonicalUrlUniqueViolation(error)) {
-            return res.status(409).json({ error: 'Opportunity with this canonical URL already exists.' });
+            return res.status(409).json({ error: 'Opportunity with this canonical URL and title already exists.' });
         }
         console.error('Error creating manual opportunity:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -1671,6 +1677,10 @@ app.put('/api/admin/opportunities/:id', authenticateAdmin, async (req, res) => {
             deadline: data.deadline ? new Date(data.deadline) : null
         };
 
+        if (Object.prototype.hasOwnProperty.call(data, 'title')) {
+            updateData.title = String(data.title || '').trim();
+        }
+
         if (Object.prototype.hasOwnProperty.call(data, 'url')) {
             updateData.canonicalUrl = getCanonicalOpportunityUrl(data.url);
         }
@@ -1682,7 +1692,7 @@ app.put('/api/admin/opportunities/:id', authenticateAdmin, async (req, res) => {
         res.json(opp);
     } catch (error) {
         if (isCanonicalUrlUniqueViolation(error)) {
-            return res.status(409).json({ error: 'Opportunity with this canonical URL already exists.' });
+            return res.status(409).json({ error: 'Opportunity with this canonical URL and title already exists.' });
         }
         res.status(500).json({ error: error.message });
     }
