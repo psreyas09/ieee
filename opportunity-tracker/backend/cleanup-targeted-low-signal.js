@@ -2,23 +2,18 @@ const API_BASE = 'https://ieee-eosin.vercel.app/api';
 const USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const PASSWORD = process.env.ADMIN_PASSWORD || 'ieeeadmin';
 
-const SEARCH_TERMS = [
-  'home',
-  'homepage',
-  'ieee-bts.org',
-  'ctsoc.ieee.org',
-  'cis.ieee.org',
-  'students.ieee.org',
-  'futurenetworks.ieee.org',
-  'ieee-eds.org',
-  'rs.ieee.org',
-  'mtt-s',
-  'ap-s',
-  'ieee region 1',
-  'ieee region 2',
-  'ieee region 5',
-  'ieee communications society homepage',
-];
+const PAGE_LIMIT = 200;
+const FETCH_TIMEOUT_MS = 30000;
+
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function normalize(v) {
   return String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -38,6 +33,19 @@ function hasEventSignal(v) {
   return /(contest|workshop|conference|summit|symposium|school|course|webinar|fellowship|scholarship|challenge|hackathon|grant|award|call\s+for\s+papers|program|internship|competition)/i.test(String(v || ''));
 }
 
+function hasStrongOpportunitySignal(v) {
+  return /(apply|deadline|register|submission|submit|nomination|cfp|call for papers|open now|applications? open|apply now|202[6-9]|20[3-9][0-9])/i.test(String(v || ''));
+}
+
+function commonPrefixWordCount(a, b) {
+  const left = normalize(a).split(' ').filter(Boolean);
+  const right = normalize(b).split(' ').filter(Boolean);
+  const max = Math.min(left.length, right.length);
+  let i = 0;
+  while (i < max && left[i] === right[i]) i += 1;
+  return i;
+}
+
 function isLowSignal(row) {
   const title = String(row?.title || '').trim();
   const t = normalize(title);
@@ -47,12 +55,23 @@ function isLowSignal(row) {
   if (simple.has(t)) return true;
   if (/(^|\s)home(page)?(\s|$)/i.test(title) && !hasEventSignal(title)) return true;
   if (looksLikeDomain(title)) return true;
+  if (/^(join our|welcome to|about us|news|events|conferences and events)\b/i.test(title) && !hasStrongOpportunitySignal(title)) return true;
+
+  const orgPrefixWords = commonPrefixWordCount(title, row?.organization?.name || '');
+  if (orgPrefixWords >= 3 && !hasEventSignal(title) && !hasStrongOpportunitySignal(title)) return true;
+
+  if (!hasEventSignal(title) && !hasStrongOpportunitySignal(title) && t.length < 30) {
+    if (/\b(community|society|chapter|council|region|technology for humanity|advancing|connecting)\b/i.test(title)) return true;
+  }
+
   if (org && (t === org || org.includes(t) || t.includes(org)) && !hasEventSignal(title)) return true;
   return false;
 }
 
 async function main() {
-  const loginRes = await fetch(`${API_BASE}/admin/login`, {
+  console.log('cleanup:start');
+
+  const loginRes = await fetchWithTimeout(`${API_BASE}/admin/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
@@ -65,14 +84,19 @@ async function main() {
 
   const { token } = await loginRes.json();
   if (!token) throw new Error('No token returned from login');
+  console.log('cleanup:login:ok');
 
   const byId = new Map();
+  let page = 1;
+  let scanned = 0;
+  while (true) {
+    const res = await fetchWithTimeout(`${API_BASE}/opportunities?page=${page}&limit=${PAGE_LIMIT}&sort=recent`);
+    if (!res.ok) break;
 
-  for (const term of SEARCH_TERMS) {
-    const res = await fetch(`${API_BASE}/opportunities?search=${encodeURIComponent(term)}&page=1&limit=200&sort=recent`);
-    if (!res.ok) continue;
     const data = await res.json();
     const rows = Array.isArray(data?.data) ? data.data : [];
+    if (!rows.length) break;
+    scanned += rows.length;
 
     for (const row of rows) {
       const isAuto = String(row?.source || '').toLowerCase() === 'auto';
@@ -81,6 +105,12 @@ async function main() {
       if (!isLowSignal(row)) continue;
       byId.set(row.id, row);
     }
+
+    const total = Number(data?.total || 0);
+    const maxPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
+    console.log(`cleanup:scan:page=${page}/${maxPages} scanned=${scanned} matched=${byId.size}`);
+    if (page >= maxPages || page > 150) break;
+    page += 1;
   }
 
   const targets = Array.from(byId.values());
@@ -88,13 +118,16 @@ async function main() {
   const failed = [];
 
   for (const row of targets) {
-    const delRes = await fetch(`${API_BASE}/admin/opportunities/${row.id}`, {
+    const delRes = await fetchWithTimeout(`${API_BASE}/admin/opportunities/${row.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
 
     if (delRes.ok) {
       deleted += 1;
+      if (deleted % 10 === 0) {
+        console.log(`cleanup:delete:deleted=${deleted}/${targets.length}`);
+      }
     } else {
       failed.push({ id: row.id, status: delRes.status, title: row.title });
     }
