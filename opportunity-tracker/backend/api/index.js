@@ -335,6 +335,60 @@ const getValidatedOrganizationFallbackUrl = async (value) => {
     return hardDead ? null : normalized;
 };
 
+const normalizeTitleForCompare = (value) => String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+const looksLikeDomainTitle = (value) => {
+    const v = String(value || '')
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '')
+        .replace(/\/$/, '')
+        .trim();
+    return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(v);
+};
+
+const hasEventSignal = (value) => /(contest|workshop|conference|summit|symposium|school|course|webinar|fellowship|scholarship|challenge|hackathon|grant|award|call\s+for\s+papers|program|internship|competition)/i.test(String(value || ''));
+
+const isLowSignalTitle = (title, organizationName) => {
+    const normalized = normalizeTitleForCompare(title);
+    if (!normalized) return true;
+
+    const simple = new Set(['home', 'homepage', 'home page', 'other', 'index', 'main', 'welcome', 'ap s']);
+    if (simple.has(normalized)) return true;
+    if (/(^|\s)home(page)?(\s|$)/i.test(String(title || '')) && !hasEventSignal(title)) return true;
+    if (looksLikeDomainTitle(title)) return true;
+
+    const org = normalizeTitleForCompare(organizationName);
+    if (org && (normalized === org || org.includes(normalized) || normalized.includes(org))) {
+        if (!hasEventSignal(title)) return true;
+    }
+
+    return false;
+};
+
+const shouldRefreshTitle = (existingTitle, incomingTitle, organizationName) => {
+    const next = String(incomingTitle || '').trim();
+    if (!next) return false;
+
+    const existingLow = isLowSignalTitle(existingTitle, organizationName);
+    const incomingLow = isLowSignalTitle(next, organizationName);
+
+    if (existingLow && !incomingLow) return true;
+
+    const currentNorm = normalizeTitleForCompare(existingTitle);
+    const nextNorm = normalizeTitleForCompare(next);
+    if (currentNorm && nextNorm && currentNorm === nextNorm) return false;
+
+    if (!incomingLow && next.length > String(existingTitle || '').trim().length + 20) {
+        return true;
+    }
+
+    return false;
+};
+
 const processScrapedOpportunities = async (organization, opportunities) => {
     let addedCount = 0;
     const scrapeUrls = parseScrapeUrls(organization?.scrapeUrl);
@@ -428,10 +482,27 @@ const processScrapedOpportunities = async (organization, opportunities) => {
         const { parsedDate, finalStatus } = deriveOpportunityTiming(opp, existing);
         const nextUrl = candidateUrl || existing.url || organizationFallbackUrl;
         const nextCanonicalUrl = getCanonicalOpportunityUrl(nextUrl) || existing.canonicalUrl || null;
+        const canRefreshAutoText = existing.source === 'auto' && existing.verified === false;
+        const incomingTitle = String(opp.title || '').trim();
+        const incomingDescription = String(opp.description || '').trim();
+        const incomingType = String(opp.type || '').trim() || 'Other';
+
+        const refreshTitle = canRefreshAutoText && shouldRefreshTitle(existing.title, incomingTitle, organization.name);
+        const refreshDescription = canRefreshAutoText && !!incomingDescription && (
+            refreshTitle ||
+            String(existing.description || '').trim().length < 80 ||
+            incomingDescription.length > String(existing.description || '').trim().length + 40
+        );
+        const refreshType = canRefreshAutoText && existing.type === 'Other' && incomingType !== 'Other';
+
         await prisma.opportunity.update({
             where: { id: existing.id },
             data: {
                 lastFetchedAt: new Date(),
+                ...(refreshTitle ? { title: incomingTitle } : {}),
+                ...(refreshDescription ? { description: incomingDescription } : {}),
+                ...(refreshType ? { type: incomingType } : {}),
+                ...(canRefreshAutoText && opp.eligibility ? { eligibility: opp.eligibility } : {}),
                 deadline: parsedDate || existing.deadline,
                 status: finalStatus,
                 url: nextUrl,

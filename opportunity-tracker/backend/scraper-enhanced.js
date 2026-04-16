@@ -362,32 +362,71 @@ function cleanTitle(value) {
   return title;
 }
 
-function isGenericTitle(value) {
+function normalizeForCompare(value) {
+  return normalizeWhitespace(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function looksLikeDomainTitle(value) {
+  const v = String(value || '')
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/$/, '')
+    .trim();
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(v);
+}
+
+function hasEventSignal(value) {
+  const v = String(value || '').toLowerCase();
+  return /(contest|workshop|conference|summit|symposium|school|course|webinar|fellowship|scholarship|challenge|hackathon|grant|award|call\s+for\s+papers|program|internship|competition)/i.test(v);
+}
+
+function isGenericTitle(value, context = {}) {
   const v = normalizeWhitespace(value).toLowerCase();
   if (!v) return true;
 
   const generic = new Set([
     'home',
     'homepage',
+    'home page',
     'welcome',
     'index',
     'main',
     'other',
+    'ap-s',
     'untitled',
     'untitled opportunity',
   ]);
 
   if (generic.has(v)) return true;
-  if (/^home\b/.test(v)) return true;
-  if (/\b(home|homepage)\s*\|\s*(ieee|mtt-s|society)\b/.test(v)) return true;
+  if (/\bhome(page)?\b/.test(v) && !hasEventSignal(v)) return true;
+  if (looksLikeDomainTitle(v)) return true;
+
+  const orgNorm = normalizeForCompare(context.organizationName || '');
+  const titleNorm = normalizeForCompare(v);
+  if (orgNorm && titleNorm && (titleNorm === orgNorm || orgNorm.includes(titleNorm) || titleNorm.includes(orgNorm))) {
+    if (!hasEventSignal(v)) return true;
+  }
+
+  if (context.url) {
+    try {
+      const hostNorm = normalizeForCompare(new URL(context.url).hostname.replace(/^www\./i, ''));
+      if (hostNorm && titleNorm === hostNorm) return true;
+    } catch {
+      // ignore parse errors
+    }
+  }
 
   return false;
 }
 
-function firstMeaningfulTitle(candidates) {
+function firstMeaningfulTitle(candidates, context = {}) {
   for (const raw of candidates) {
     const cleaned = cleanTitle(raw);
-    if (!isGenericTitle(cleaned)) {
+    if (!isGenericTitle(cleaned, context)) {
       return cleaned;
     }
   }
@@ -398,7 +437,7 @@ function firstMeaningfulTitle(candidates) {
  * Lightweight HTML extraction used by worker mode.
  * This avoids placeholder rows when the full AI extractor is not wired in this path.
  */
-async function processHTML(html, url) {
+async function processHTML(html, url, organizationName) {
   log('info', 'Processing', 'Analyzing HTML', { url });
 
   const $ = cheerio.load(String(html || ''));
@@ -406,24 +445,23 @@ async function processHTML(html, url) {
 
   const pageTitle = $('title').first().text();
   const h1Title = $('h1').first().text();
+  const h2Title = $('h2').first().text();
   const ogTitle = $('meta[property="og:title"]').attr('content') || '';
   const twitterTitle = $('meta[name="twitter:title"]').attr('content') || '';
-  const fallbackTitle = (() => {
-    try {
-      const parsed = new URL(url);
-      return cleanTitle(parsed.hostname.replace(/^www\./i, ''));
-    } catch {
-      return 'Untitled Opportunity';
-    }
-  })();
-
   const title = firstMeaningfulTitle([
     h1Title,
+    h2Title,
     ogTitle,
     twitterTitle,
     pageTitle,
-    fallbackTitle,
-  ]) || fallbackTitle;
+  ], {
+    url,
+    organizationName,
+  });
+
+  if (!title) {
+    throw new Error('parse_error: generic or missing title extracted');
+  }
 
   const description = normalizeWhitespace($('body').text()).slice(0, 2000);
   if (!description || description.length < 40) {
@@ -664,7 +702,7 @@ async function processURL(item) {
     const { html, methodUsed } = await Promise.race([fetchAttempt, timeoutAttempt]);
 
     // Process HTML through pipeline
-    const result = await processHTML(html, url);
+    const result = await processHTML(html, url, organizationName);
     result.sourceUrl = url;
     result.methodUsed = methodUsed;
     result.scrapedAt = new Date().toISOString();
