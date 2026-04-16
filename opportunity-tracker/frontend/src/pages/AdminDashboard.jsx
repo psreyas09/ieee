@@ -12,6 +12,7 @@ export default function AdminDashboard() {
     const [toast, setToast] = useState('');
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [hideNoise, setHideNoise] = useState(true);
     const [isScrapingAll, setIsScrapingAll] = useState(false);
     const [scrapeProgress, setScrapeProgress] = useState(null);
     const [scrapeHealthRows, setScrapeHealthRows] = useState([]);
@@ -39,13 +40,13 @@ export default function AdminDashboard() {
         fetchData();
         const interval = setInterval(fetchData, 30000);
         return () => clearInterval(interval);
-    }, [navigate, page]);
+    }, [navigate, page, hideNoise]);
 
     const fetchData = async () => {
         try {
             const [orgsResult, oppsResult, scrapeHealthResult, duplicatesResult] = await Promise.allSettled([
                 getOrganizations(),
-                getOpportunities({ limit: 100, page, sort: 'recent' }),
+                getOpportunities({ limit: 100, page, sort: 'recent', excludeNoise: hideNoise }),
                 getScrapeHealth(),
                 getDuplicateGroups()
             ]);
@@ -699,6 +700,18 @@ export default function AdminDashboard() {
                         <div>
                             <h2 className="font-bold text-slate-800 dark:text-slate-100">Recent Opportunities</h2>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Showing up to 100 entries per page.</p>
+                            <label className="mt-2 inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                <input
+                                    type="checkbox"
+                                    checked={hideNoise}
+                                    onChange={(e) => {
+                                        setPage(1);
+                                        setHideNoise(e.target.checked);
+                                    }}
+                                    className="rounded border-slate-300 text-ieee-blue focus:ring-ieee-blue"
+                                />
+                                Hide generic page-noise rows
+                            </label>
                         </div>
                         <button
                             onClick={openCreateOpportunityModal}

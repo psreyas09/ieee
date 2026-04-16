@@ -824,7 +824,7 @@ app.get('/api/organizations', async (req, res) => {
 
 app.get('/api/opportunities', async (req, res) => {
     try {
-        const { organizationId, type, types, status, search, sort, persona, page = 1, limit = 20 } = req.query;
+        const { organizationId, type, types, status, search, sort, persona, excludeNoise, page = 1, limit = 20 } = req.query;
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
@@ -847,6 +847,30 @@ app.get('/api/opportunities', async (req, res) => {
                 { title: { contains: search, mode: 'insensitive' } },
                 { description: { contains: search, mode: 'insensitive' } },
             ];
+        }
+
+        const shouldExcludeNoise = String(excludeNoise || '').toLowerCase() === 'true';
+        if (shouldExcludeNoise) {
+            const noiseClauses = [
+                { title: { in: ['Upcoming Events', 'Conferences and Events', 'Featured articles', 'Latest IES News', 'Latest News', 'Quick Reminders', "What's New", 'Magazine'] } },
+                { title: { startsWith: "President's Message", mode: 'insensitive' } },
+                { title: { startsWith: 'Join our vibrant community', mode: 'insensitive' } },
+                { title: { startsWith: 'Join the Largest Global Community', mode: 'insensitive' } },
+                { title: { startsWith: 'Stay in the know by subscribing', mode: 'insensitive' } },
+                { title: { startsWith: 'Join IEEE ComSoc or Renew Today', mode: 'insensitive' } },
+                { title: { startsWith: 'Who Is EMC Society', mode: 'insensitive' } },
+                { title: { startsWith: 'From the IEEE RS Video Library', mode: 'insensitive' } },
+                { title: { startsWith: 'Linking Research to Practice', mode: 'insensitive' } },
+                { title: { startsWith: 'BTS Memberships', mode: 'insensitive' } },
+                { title: { startsWith: 'The Opportunity', mode: 'insensitive' } },
+                { title: { startsWith: 'News & Announcements', mode: 'insensitive' } },
+                { title: { contains: 'newsletter', mode: 'insensitive' } },
+                { title: { contains: 'transactions on prof comm', mode: 'insensitive' } },
+            ];
+
+            where.NOT = Array.isArray(where.NOT)
+                ? [...where.NOT, { OR: noiseClauses }]
+                : [{ OR: noiseClauses }];
         }
 
         const personaRestriction = buildPersonaRestrictionWhere(persona);
