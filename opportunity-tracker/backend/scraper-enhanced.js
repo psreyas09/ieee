@@ -362,6 +362,38 @@ function cleanTitle(value) {
   return title;
 }
 
+function isGenericTitle(value) {
+  const v = normalizeWhitespace(value).toLowerCase();
+  if (!v) return true;
+
+  const generic = new Set([
+    'home',
+    'homepage',
+    'welcome',
+    'index',
+    'main',
+    'other',
+    'untitled',
+    'untitled opportunity',
+  ]);
+
+  if (generic.has(v)) return true;
+  if (/^home\b/.test(v)) return true;
+  if (/\b(home|homepage)\s*\|\s*(ieee|mtt-s|society)\b/.test(v)) return true;
+
+  return false;
+}
+
+function firstMeaningfulTitle(candidates) {
+  for (const raw of candidates) {
+    const cleaned = cleanTitle(raw);
+    if (!isGenericTitle(cleaned)) {
+      return cleaned;
+    }
+  }
+  return '';
+}
+
 /**
  * Lightweight HTML extraction used by worker mode.
  * This avoids placeholder rows when the full AI extractor is not wired in this path.
@@ -372,8 +404,10 @@ async function processHTML(html, url) {
   const $ = cheerio.load(String(html || ''));
   $('script, style, noscript, nav, footer, header').remove();
 
-  const pageTitle = cleanTitle($('title').first().text());
-  const h1Title = cleanTitle($('h1').first().text());
+  const pageTitle = $('title').first().text();
+  const h1Title = $('h1').first().text();
+  const ogTitle = $('meta[property="og:title"]').attr('content') || '';
+  const twitterTitle = $('meta[name="twitter:title"]').attr('content') || '';
   const fallbackTitle = (() => {
     try {
       const parsed = new URL(url);
@@ -383,7 +417,13 @@ async function processHTML(html, url) {
     }
   })();
 
-  const title = pageTitle || h1Title || fallbackTitle;
+  const title = firstMeaningfulTitle([
+    h1Title,
+    ogTitle,
+    twitterTitle,
+    pageTitle,
+    fallbackTitle,
+  ]) || fallbackTitle;
 
   const description = normalizeWhitespace($('body').text()).slice(0, 2000);
   if (!description || description.length < 40) {
