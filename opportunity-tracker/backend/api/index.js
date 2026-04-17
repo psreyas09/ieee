@@ -64,10 +64,10 @@ const getOrganizationQueueUrls = (org) => {
     return [];
 };
 
-const SCRAPE_QUEUE_COOLDOWN_MS = Math.max(60 * 1000, Number(process.env.SCRAPE_QUEUE_COOLDOWN_MS || 60 * 60 * 1000));
-const SCRAPE_QUEUE_ORG_LIMIT = Math.max(1, Number(process.env.SCRAPE_QUEUE_ORG_LIMIT || 5));
-const SCRAPE_QUEUE_URLS_PER_ORG = Math.max(1, Number(process.env.SCRAPE_QUEUE_URLS_PER_ORG || 2));
-const SCRAPE_QUEUE_TOTAL_URL_LIMIT = Math.max(1, Number(process.env.SCRAPE_QUEUE_TOTAL_URL_LIMIT || 5));
+const SCRAPE_QUEUE_COOLDOWN_MS = Math.max(60 * 1000, Number(process.env.SCRAPE_QUEUE_COOLDOWN_MS || 3 * 60 * 60 * 1000));
+const SCRAPE_QUEUE_ORG_LIMIT = Math.max(1, Number(process.env.SCRAPE_QUEUE_ORG_LIMIT || 2));
+const SCRAPE_QUEUE_URLS_PER_ORG = Math.max(1, Number(process.env.SCRAPE_QUEUE_URLS_PER_ORG || 1));
+const SCRAPE_QUEUE_TOTAL_URL_LIMIT = Math.max(1, Number(process.env.SCRAPE_QUEUE_TOTAL_URL_LIMIT || 2));
 
 const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
 

@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { getOrganizations, triggerScrape, getOpportunities, deleteOpportunity, createOpportunity, updateOpportunity, updateOrganization, createOrganization, deleteOrganization, addOrganizationScrapeUrl, deleteOrganizationScrapeUrl, getScrapeHealth, getDuplicateGroups, mergeDuplicates, verifyOpportunity } from '../services/api';
 import { Activity, Trash2, ExternalLink, RefreshCw, LogOut, PlusCircle, X, Pencil } from 'lucide-react';
 
+const ADMIN_REFRESH_MS = 300000;
+const ADMIN_PAGE_LIMIT = 50;
+
 export default function AdminDashboard() {
     const navigate = useNavigate();
     const [orgs, setOrgs] = useState([]);
@@ -38,17 +41,17 @@ export default function AdminDashboard() {
             return;
         }
         fetchData();
-        const interval = setInterval(fetchData, 30000);
+        const interval = setInterval(fetchData, ADMIN_REFRESH_MS);
         return () => clearInterval(interval);
-    }, [navigate, page, hideNoise]);
+    }, [navigate, page, hideNoise, showScrapeHealth, showDuplicateMerge]);
 
     const fetchData = async () => {
         try {
             const [orgsResult, oppsResult, scrapeHealthResult, duplicatesResult] = await Promise.allSettled([
                 getOrganizations(),
-                getOpportunities({ limit: 100, page, sort: 'recent', excludeNoise: hideNoise }),
-                getScrapeHealth(),
-                getDuplicateGroups()
+                getOpportunities({ limit: ADMIN_PAGE_LIMIT, page, sort: 'recent', excludeNoise: hideNoise }),
+                showScrapeHealth ? getScrapeHealth() : Promise.resolve({ data: scrapeHealthRows }),
+                showDuplicateMerge ? getDuplicateGroups() : Promise.resolve({ data: duplicateGroups })
             ]);
 
             if (orgsResult.status === 'fulfilled') {
@@ -699,7 +702,7 @@ export default function AdminDashboard() {
                     <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 flex justify-between items-center">
                         <div>
                             <h2 className="font-bold text-slate-800 dark:text-slate-100">Recent Opportunities</h2>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Showing up to 100 entries per page.</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Showing up to 50 entries per page. Auto-refresh every 5 minutes.</p>
                             <label className="mt-2 inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                                 <input
                                     type="checkbox"

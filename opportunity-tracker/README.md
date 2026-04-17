@@ -74,6 +74,9 @@ A full-stack web application designed for IEEE student members to discover compe
    - show `officialWebsite` as labeled fallback URL when no explicit scrape URL exists
 - Admin dashboard now supports creating a **new organization** with type, official website, and scrape URLs.
 - Admin dashboard now auto-refreshes organizations/opportunities every 30 seconds.
+- Admin dashboard now supports noise-aware browsing for opportunities:
+   - default view hides common generic page-noise rows (marketing/newsletter/header-like entries)
+   - toggle in Admin table allows showing full raw feed when needed
 - Backend validates `scrapeUrl` and `officialWebsite` on admin updates (must be valid `http(s)` URLs).
 - Scraper now tries all configured scrape URLs for an organization, then falls back to `officialWebsite`.
 - Student Activities defaults were corrected to `https://students.ieee.org/`.
@@ -122,14 +125,29 @@ Payload:
 Behavior:
 - toggles verification status for an opportunity
 - verification status is reflected in admin table and public UI badges
+- does not delete, re-scrape, or auto-fix low-quality titles
+
+### Admin Noise Filtering
+
+Admin dashboard requests opportunities with `excludeNoise=true` by default to suppress generic rows that are commonly scraped from landing pages.
+
+Important behavior:
+- This filter changes visibility in admin list views only; it does not delete rows from the database.
+- The admin toggle can disable this filter to inspect the full raw feed.
+- If permanent removal is needed, use admin delete action or a targeted cleanup operation.
 
 ## Feed Query Notes
 
 `GET /api/opportunities` supports both single-type and multi-type filtering:
 - `type=Grant` (single type)
 - `types=Competition,Grant,Fellowship` (multi-select type filter)
+- `excludeNoise=true` (optional: hide common generic page-noise rows)
 
 When keyword search is used in the feed UI, type preference defaults are not forced so exact text matches remain discoverable.
+
+### Why some "Other" rows still appear
+
+Not every `Other` type row is noise. Conference announcements, webinars, calls for papers, nominations, and awards can still be legitimate opportunities and are intentionally retained unless explicitly deleted.
 
 ## Client-Side Preference Storage
 

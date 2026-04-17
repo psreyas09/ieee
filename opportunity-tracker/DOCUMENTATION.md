@@ -15,6 +15,7 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - React Router for app navigation
 - Axios client with JWT auth interceptor
 - Admin dashboard for scraping and manual data operations
+- Admin dashboard supports optional noise-aware opportunity listing (hide generic landing-page rows)
 
 ### Backend
 - Node.js + Express exposed via Vercel serverless routes
@@ -96,6 +97,12 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - Scrape Health section with sortable reliability table and failed-only quick filter
 - Duplicate Merge panel with grouped duplicate candidates, selectable primary record, and merge action
 - Scrape Health and Duplicate Merge sections are collapsed by default and expand on button click
+- Opportunities table defaults to noise-filtered mode and can be toggled to view full raw feed
+
+### Verification semantics
+- `Verify` only toggles `verified` state on an opportunity.
+- It does not delete rows and does not trigger re-scraping.
+- Use delete actions (or cleanup scripts) for permanent removal.
 
 ## Recent Reliability and UX Additions
 
@@ -159,6 +166,10 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 	 - opportunities API now supports `persona` query and applies eligibility exclusion rules before pagination
 	 - this prevents ineligible opportunities (for example, IEEE-members-only items for `Non-IEEE Member`) from leaking into later pages
 	 - dashboard/feed totals can decrease after persona filtering because ineligible records are intentionally removed from result sets
+22. Admin noise filtering support:
+	 - opportunities API accepts `excludeNoise=true` to suppress common landing-page/newsletter/promotional rows
+	 - admin dashboard consumes this mode by default, with a toggle to inspect unfiltered results
+	 - filter is non-destructive (visibility only), preserving data for audit/recovery
 
 ## API Surface (Key Endpoints)
 
@@ -172,6 +183,11 @@ IEEE Opportunity Tracker is a full-stack platform that aggregates IEEE student o
 - `type=<singleType>` for single type filtering
 - `types=<csv>` for multi-type filtering (example: `types=Competition,Grant,Fellowship`)
 - `persona=<personaLabel>` for eligibility-aware filtering (for example: `Non-IEEE Member`, `Undergraduate Student`, `Graduate Student`, `Young Professional`)
+- `excludeNoise=true` for hiding generic page-noise rows (optional; primarily used by admin table views)
+
+Notes:
+- `excludeNoise` is intended for list quality/readability, not for hard deletion.
+- Some `Other` items remain valid opportunities (for example: conference calls, society awards, and nomination notices).
 
 ### Admin (JWT required)
 - `POST /api/admin/login`
