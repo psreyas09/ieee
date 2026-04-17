@@ -227,6 +227,17 @@ Notes:
 - `CRON_SECRET`
 - `VITE_API_URL` (`/api` for same-domain deployment)
 
+### Optional worker tuning variables (Railway)
+- `BATCH_SIZE` (default in low-usage profile: `2`)
+- `MAX_CONCURRENT` (recommended: `1` for free tier)
+- `IDLE_SLEEP_MS` (recommended: `900000`)
+- `URL_SEEN_COOLDOWN_MS` (recommended: `21600000`)
+- `REQUEST_DELAY_MIN_MS` (recommended: `3000`)
+- `REQUEST_DELAY_MAX_MS` (recommended: `8000`)
+- `PAGE_TIMEOUT_MS` (recommended: `30000`)
+- `API_SEND_RETRIES` (recommended: `1`; ultra-safe `0`)
+- `API_SEND_BACKOFF_BASE_MS` (recommended: `3000`)
+
 ### Monorepo settings
 - Repository: `psreyas09/ieee`
 - Production branch: `main`
@@ -236,6 +247,46 @@ Notes:
 - Keep `frontend/dist` untracked in git to avoid stale static assets overriding fresh builds
 
 ## Operations Runbook
+
+### Free-tier low-usage profile (Railway + Neon)
+Use this preset to reduce DB/compute pressure:
+
+```env
+MAX_CONCURRENT=1
+BATCH_SIZE=2
+IDLE_SLEEP_MS=900000
+URL_SEEN_COOLDOWN_MS=21600000
+REQUEST_DELAY_MIN_MS=3000
+REQUEST_DELAY_MAX_MS=8000
+PAGE_TIMEOUT_MS=30000
+API_SEND_RETRIES=1
+API_SEND_BACKOFF_BASE_MS=3000
+```
+
+If limits are still exhausted, switch to ultra-safe mode:
+- `BATCH_SIZE=1`
+- `API_SEND_RETRIES=0`
+
+Rationale:
+- Lower batch/concurrency reduces bursts of write operations.
+- Longer idle/dedup windows reduce repeated queue polling and URL reprocessing.
+- Lower retries avoid duplicate delivery pressure during transient backend/network issues.
+
+### Quick-start operations checklist (free tier)
+
+1. Apply low-usage worker preset values.
+2. Restart worker after env changes.
+3. Keep admin usage minimal (open only when needed).
+4. Scrape in small batches before running broad org coverage.
+5. Check logs for frequent retries and repeated send failures.
+
+If quota is exhausted:
+
+1. Switch to ultra-safe mode:
+	- `BATCH_SIZE=1`
+	- `API_SEND_RETRIES=0`
+2. Wait for quota reset.
+3. Resume with one organization first, then increase slowly.
 
 ### Client preference storage keys
 - `ieee.preferences.v1`: onboarding preferences (persona, region, interests)

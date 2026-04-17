@@ -222,6 +222,58 @@ When deploying to Vercel, **you do not use `.env` files.** Instead, you must add
 3. **Important for Frontend:** Add the following key to let the React app know where the API is hosted in production:
    - \`VITE_API_URL\` = \`/api\`  *(Since Vercel serves the API on the same domain as the frontend, a relative path is required).*
 
+### 3. Railway Worker (Low-Usage Free-Tier Preset)
+
+If you are running the scraper worker on Railway and Neon free-tier limits are tight, use this conservative preset.
+
+```env
+# Required
+API_SECRET=<must match backend SCRAPER_API_SECRET>
+API_URL=https://<your-backend-domain>
+
+# Throughput / concurrency
+MAX_CONCURRENT=1
+BATCH_SIZE=2
+
+# Polling / dedup windows
+IDLE_SLEEP_MS=900000
+URL_SEEN_COOLDOWN_MS=21600000
+
+# Fetch pacing
+PAGE_TIMEOUT_MS=30000
+REQUEST_DELAY_MIN_MS=3000
+REQUEST_DELAY_MAX_MS=8000
+
+# API send retry pressure
+API_SEND_RETRIES=1
+API_SEND_BACKOFF_BASE_MS=3000
+```
+
+Ultra-safe profile (if limits are still exhausted):
+- `BATCH_SIZE=1`
+- `API_SEND_RETRIES=0`
+- keep `MAX_CONCURRENT=1`
+
+Notes:
+- `API_SEND_RETRIES=2` with small backoff can increase write pressure during transient failures.
+- A larger `URL_SEEN_COOLDOWN_MS` reduces repeat processing of the same URLs.
+
+### Free-Tier Quick Start Checklist
+
+Use this checklist when running on Railway + Neon free-tier:
+
+1. Set worker env vars to low-usage preset.
+2. Deploy and restart worker once after env update.
+3. In Admin, keep `Hide generic page-noise rows` enabled.
+4. Run small scrape batches first (single org or small subset).
+5. Watch logs for retry spikes and repeated send failures.
+
+If limits are exhausted:
+
+1. Switch to ultra-safe mode (`BATCH_SIZE=1`, `API_SEND_RETRIES=0`).
+2. Pause scraping until quota reset window.
+3. Resume with one-org test scrape, then scale gradually.
+
 ## Local Development Setup
 
 1. **Install Dependencies**
@@ -270,6 +322,11 @@ Expected response: JSON object containing `message` and `results`.
 - `500 CRON_SECRET is missing`: add `CRON_SECRET` in Vercel env vars and redeploy.
 - `Cannot GET /api/cron/scrape-batch`: old deployment is serving; deploy latest commit and verify project root/repo settings.
 - `429 Google AI quota/rate-limit exceeded`: Gemini key(s) exhausted; wait for reset or configure secondary key(s).
+
+### If Neon free-tier limit is exhausted
+1. Apply the Railway low-usage preset above.
+2. Keep admin dashboard open only when needed (auto-refresh still causes periodic DB reads).
+3. Use manual scrape runs in smaller batches instead of sustained high-throughput scraping.
 
 ## Admin Organization Management
 
